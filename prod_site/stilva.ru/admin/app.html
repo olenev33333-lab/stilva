@@ -183,6 +183,16 @@
 #orders-right-table tbody tr.status-inprogress { background:#fefce8; } /* very pale yellow */
 </style>
 
+<style>
+/* ===== DDS layout safety ===== */
+.card, .card-body, .scroll-area { min-width: 0; }
+#dds-left-table, #dds-right-table { width:100%; table-layout: fixed; }
+#dds-left-table td, #dds-right-table td { word-break: break-word; }
+#dds-left-table tbody tr.dds-void,
+#dds-right-table tbody tr.dds-void { opacity:.6; }
+.dds-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+</style>
+
 
 </head>
 <body>
@@ -277,6 +287,58 @@
               <th><span class="th-sort" data-col="status">Статус <i class="carret"></i></span></th>
               <th></th>
             </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="dds-left" style="display:none">
+    <div class="card-head" style="margin-top:-8px">
+      <h3 class="card-title">ДДС</h3>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="dds-from-left" type="date">
+        <input id="dds-to-left" type="date">
+        <select id="dds-type-left" title="Тип">
+          <option value="">Тип: все</option>
+          <option value="income">Только приход</option>
+          <option value="expense">Только расход</option>
+        </select>
+        <select id="dds-status-left" title="Статус">
+          <option value="">Статус: все</option>
+          <option value="active">Только активные</option>
+          <option value="void">Только аннулированные</option>
+        </select>
+        <select id="dds-payment-left" title="Способ оплаты">
+          <option value="">Оплата: все</option>
+          <option value="cash">Наличные</option>
+          <option value="card">Карта</option>
+          <option value="transfer">Перевод</option>
+          <option value="bank">Безнал</option>
+        </select>
+        <select id="dds-category-left" title="Категория">
+          <option value="">Категория: все</option>
+        </select>
+        <button id="dds-apply-left" class="ghost">Показать</button>
+        <button id="dds-add-left">+ Проводка</button>
+        <button class="ghost" id="close-dds-left">Закрыть</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="scroll-area" id="dds-pane-left">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <div id="dds-kpi-left" class="muted" style="padding:8px 8px 12px"></div>
+        <table id="dds-left-table">
+          <colgroup>
+            <col style="width:90px"><col style="width:90px"><col style="width:110px"><col style="width:150px">
+            <col style="width:110px"><col style="width:110px"><col style="width:auto"><col style="width:80px"><col style="width:120px">
+          </colgroup>
+          <thead>
+          <tr>
+            <th>Дата</th><th>Тип</th><th>Сумма</th><th>Категория</th>
+            <th>Оплата</th><th>Статус</th><th>Комментарий</th><th>Заказ</th><th></th>
+          </tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -378,6 +440,58 @@
         </div>
       </div>
 
+      <div id="dds-right" style="display:none">
+        <div class="card-head" style="margin-top:-8px">
+          <h3 class="card-title">ДДС</h3>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="dds-from-right" type="date">
+            <input id="dds-to-right" type="date">
+            <select id="dds-type-right" title="Тип">
+              <option value="">Тип: все</option>
+              <option value="income">Только приход</option>
+              <option value="expense">Только расход</option>
+            </select>
+            <select id="dds-status-right" title="Статус">
+              <option value="">Статус: все</option>
+              <option value="active">Только активные</option>
+              <option value="void">Только аннулированные</option>
+            </select>
+            <select id="dds-payment-right" title="Способ оплаты">
+              <option value="">Оплата: все</option>
+              <option value="cash">Наличные</option>
+              <option value="card">Карта</option>
+              <option value="transfer">Перевод</option>
+              <option value="bank">Безнал</option>
+            </select>
+            <select id="dds-category-right" title="Категория">
+              <option value="">Категория: все</option>
+            </select>
+            <button id="dds-apply-right" class="ghost">Показать</button>
+            <button id="dds-add-right">+ Проводка</button>
+            <button class="ghost" id="close-dds-right">Закрыть</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="scroll-area" id="dds-pane-right">
+            <div class="pane-overlay"><div class="pane-spinner"></div></div>
+            <div id="dds-kpi-right" class="muted" style="padding:8px 8px 12px"></div>
+            <table id="dds-right-table">
+              <colgroup>
+                <col style="width:90px"><col style="width:90px"><col style="width:110px"><col style="width:150px">
+                <col style="width:110px"><col style="width:110px"><col style="width:auto"><col style="width:80px"><col style="width:120px">
+              </colgroup>
+              <thead>
+              <tr>
+                <th>Дата</th><th>Тип</th><th>Сумма</th><th>Категория</th>
+                <th>Оплата</th><th>Статус</th><th>Комментарий</th><th>Заказ</th><th></th>
+              </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </section>
   </div>
 </div>
@@ -420,6 +534,60 @@
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: ДДС (проводка) -->
+<div class="modal-backdrop" id="dds-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dds-modal-title">
+    <div class="modal-head">
+      <h3 id="dds-modal-title" class="card-title" style="margin:0">Проводка</h3>
+      <button class="close-x" id="dds-modal-close">✕</button>
+    </div>
+    <div style="padding:12px;display:grid;gap:10px">
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Дата</label>
+            <input type="date" id="dds_date">
+          </div>
+          <div class="adm-field">
+            <label>Тип</label>
+            <select id="dds_type">
+              <option value="income">Приход</option>
+              <option value="expense">Расход</option>
+            </select>
+          </div>
+          <div class="adm-field">
+            <label>Сумма, ₽</label>
+            <input type="number" id="dds_amount" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Категория</label>
+            <select id="dds_category"></select>
+          </div>
+          <div class="adm-field">
+            <label>Способ оплаты</label>
+            <select id="dds_payment">
+              <option value="cash">Наличные</option>
+              <option value="card">Карта</option>
+              <option value="transfer">Перевод</option>
+              <option value="bank">Безнал</option>
+            </select>
+          </div>
+          <div class="adm-field">
+            <label>Комментарий</label>
+            <textarea id="dds_comment" rows="4" placeholder="Например: аренда за месяц"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="adm-actions">
+        <button class="adm-btn adm-btn--ghost" id="dds-modal-cancel">Отмена</button>
+        <button class="adm-btn adm-btn--accent" id="dds-modal-save">Сохранить</button>
       </div>
     </div>
   </div>
@@ -720,6 +888,249 @@ async function ensureItems(orders){
   }));
 }
 
+/* ===== ДДС ===== */
+const ddsTypeLabels = { income: 'Приход', expense: 'Расход' };
+const ddsStatusLabels = { active: 'Активна', void: 'Аннулирована' };
+const ddsPaymentLabels = { cash: 'Наличные', card: 'Карта', transfer: 'Перевод', bank: 'Безнал' };
+const ddsFallback = {
+  income: ['Продажа','Доп. услуги','Прочее'],
+  expense: ['Закупка','Доставка','Аренда','Зарплата','Реклама','Налоги','Хозяйственные','Прочее']
+};
+const ddsState = { categories: { income: [], expense: [] } };
+
+function ddsToNum(v){
+  if (v == null) return 0;
+  const s = String(v).replace(/\s+/g,'').replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function ddsMergeCats(list, fallback){
+  const set = new Set((list || []).map(x => x.name));
+  const out = (list || []).slice();
+  (fallback || []).forEach(name => { if (!set.has(name)) out.push({ name }); });
+  return out;
+}
+
+async function ddsLoadCategories(type){
+  if (!type) return;
+  if (ddsState.categories[type] && ddsState.categories[type].length) return;
+  try{
+    const res = await api('/api/cashflow/categories?type=' + encodeURIComponent(type));
+    if (res.ok){
+      const list = await res.json();
+      ddsState.categories[type] = ddsMergeCats(list, ddsFallback[type]);
+      return;
+    }
+  }catch(_){}
+  ddsState.categories[type] = ddsMergeCats([], ddsFallback[type]);
+}
+
+async function ddsFillCategorySelect(selectEl, type, keepValue){
+  if (!selectEl) return;
+  if (type) {
+    await ddsLoadCategories(type);
+  } else {
+    await ddsLoadCategories('income');
+    await ddsLoadCategories('expense');
+  }
+  const list = type
+    ? (ddsState.categories[type] || [])
+    : [...(ddsState.categories.income||[]), ...(ddsState.categories.expense||[])];
+  selectEl.innerHTML = '<option value="">Категория: все</option>' +
+    list.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  if (keepValue) selectEl.value = keepValue;
+}
+
+function ddsBuildQuery(params){
+  const q = Object.entries(params).filter(([,v])=>v).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  return q ? ('?' + q) : '';
+}
+
+async function loadDds(side){
+  const pane = document.getElementById(`dds-pane-${side}`);
+  const tbody = document.querySelector(`#dds-${side}-table tbody`);
+  const kpi = document.getElementById(`dds-kpi-${side}`);
+  if (!pane || !tbody || !kpi) return;
+
+  const from = document.getElementById(`dds-from-${side}`)?.value || '';
+  const to = document.getElementById(`dds-to-${side}`)?.value || '';
+  const type = document.getElementById(`dds-type-${side}`)?.value || '';
+  const status = document.getElementById(`dds-status-${side}`)?.value || '';
+  const payment = document.getElementById(`dds-payment-${side}`)?.value || '';
+  const categoryEl = document.getElementById(`dds-category-${side}`);
+  const category = categoryEl?.value || '';
+
+  await ddsFillCategorySelect(categoryEl, type || '', category);
+
+  const cols = document.querySelector(`#dds-${side}-table colgroup`).children.length;
+  tbody.innerHTML = skeletonRows(cols, 6);
+
+  await withOverlay(pane, async ()=>{
+    const res = await api('/api/cashflow' + ddsBuildQuery({ from, to, type, status, payment, category }));
+    const list = res.ok ? await res.json() : [];
+
+    const income = list.filter(x=>x.status !== 'void' && x.type === 'income').reduce((s,x)=>s+ddsToNum(x.amount),0);
+    const expense = list.filter(x=>x.status !== 'void' && x.type === 'expense').reduce((s,x)=>s+ddsToNum(x.amount),0);
+    const net = income - expense;
+
+    kpi.innerHTML = `
+      <div class="dds-kpi-grid">
+        <div class="stat-card"><div class="stat-title">Приход</div><div class="stat-value">${income.toLocaleString('ru-RU',{minimumFractionDigits:2, maximumFractionDigits:2})} ₽</div></div>
+        <div class="stat-card"><div class="stat-title">Расход</div><div class="stat-value">${expense.toLocaleString('ru-RU',{minimumFractionDigits:2, maximumFractionDigits:2})} ₽</div></div>
+        <div class="stat-card"><div class="stat-title">Чистый поток</div><div class="stat-value">${net.toLocaleString('ru-RU',{minimumFractionDigits:2, maximumFractionDigits:2})} ₽</div></div>
+      </div>`;
+    kpi.classList && kpi.classList.remove('muted');
+
+    tbody.innerHTML = '';
+    list.forEach(row=>{
+      const tr = document.createElement('tr');
+      if (row.status === 'void') tr.classList.add('dds-void');
+      const orderTxt = row.order_id ? ('#' + row.order_id) : '—';
+      tr.innerHTML =
+        `<td class="cell-ellipsis">${row.date || '—'}</td>` +
+        `<td class="cell-ellipsis">${ddsTypeLabels[row.type] || row.type}</td>` +
+        `<td class="cell-ellipsis">${ddsToNum(row.amount).toLocaleString('ru-RU',{minimumFractionDigits:2, maximumFractionDigits:2})}</td>` +
+        `<td class="cell-ellipsis">${row.category || '—'}</td>` +
+        `<td class="cell-ellipsis">${ddsPaymentLabels[row.payment_method] || row.payment_method}</td>` +
+        `<td class="cell-ellipsis">${ddsStatusLabels[row.status] || row.status}</td>` +
+        `<td class="cell-wrap">${row.comment ? String(row.comment) : '—'}</td>` +
+        `<td class="cell-ellipsis">${orderTxt}</td>` +
+        `<td class="actions"><div class="btns">` +
+          (row.status === 'void'
+            ? `<button class="ghost dds-restore" data-id="${row.id}">Вернуть</button>`
+            : `<button class="ghost dds-void" data-id="${row.id}">Аннулировать</button>`) +
+          `<button class="danger dds-delete" data-id="${row.id}">Удалить</button>` +
+        `</div></td>`;
+      tbody.appendChild(tr);
+    });
+    if (!list.length){
+      tbody.innerHTML = `<tr><td colspan="9"><span class="muted">Проводок нет</span></td></tr>`;
+    }
+  });
+}
+
+function ddsIsOpen(side){
+  const el = document.getElementById(`dds-${side}`);
+  return el && el.style.display !== 'none';
+}
+
+function ddsRefreshOpen(){
+  if (ddsIsOpen('left')) loadDds('left');
+  if (ddsIsOpen('right')) loadDds('right');
+}
+
+function ddsModalOpen(side){
+  const back = document.getElementById('dds-modal-backdrop');
+  if (!back) return;
+  const typeSel = document.getElementById('dds_type');
+  const dateInput = document.getElementById('dds_date');
+  const amountInput = document.getElementById('dds_amount');
+  const commentInput = document.getElementById('dds_comment');
+  const paymentSel = document.getElementById('dds_payment');
+
+  const defaultType = document.getElementById(`dds-type-${side}`)?.value || 'income';
+  typeSel.value = defaultType || 'income';
+  dateInput.value = new Date().toISOString().slice(0,10);
+  amountInput.value = '';
+  commentInput.value = '';
+  paymentSel.value = 'bank';
+  ddsFillCategorySelect(document.getElementById('dds_category'), typeSel.value).then(()=>{
+    const catSel = document.getElementById('dds_category');
+    if (catSel) catSel.value = '';
+  });
+  back.style.display = 'flex';
+}
+
+function ddsModalClose(){
+  const back = document.getElementById('dds-modal-backdrop');
+  if (back) back.style.display = 'none';
+}
+
+document.addEventListener('change', (e)=>{
+  const t = e.target.closest('#dds_type');
+  if (t){
+    ddsFillCategorySelect(document.getElementById('dds_category'), t.value);
+  }
+  const typeLeft = e.target.closest('#dds-type-left');
+  if (typeLeft) ddsFillCategorySelect(document.getElementById('dds-category-left'), typeLeft.value, document.getElementById('dds-category-left')?.value || '');
+  const typeRight = e.target.closest('#dds-type-right');
+  if (typeRight) ddsFillCategorySelect(document.getElementById('dds-category-right'), typeRight.value, document.getElementById('dds-category-right')?.value || '');
+});
+
+document.addEventListener('click', async (e)=>{
+  const v = e.target.closest('.dds-void');
+  const r = e.target.closest('.dds-restore');
+  const d = e.target.closest('.dds-delete');
+  if (v){
+    const id = v.dataset.id;
+    await withOverlay(v, async ()=>{
+      await api('/api/cashflow/' + id, { method:'PATCH', body: JSON.stringify({ status: 'void' }) });
+      ddsRefreshOpen();
+    });
+  }
+  if (r){
+    const id = r.dataset.id;
+    await withOverlay(r, async ()=>{
+      await api('/api/cashflow/' + id, { method:'PATCH', body: JSON.stringify({ status: 'active' }) });
+      ddsRefreshOpen();
+    });
+  }
+  if (d){
+    const id = d.dataset.id;
+    if (!confirm('Удалить проводку #' + id + '?')) return;
+    await withOverlay(d, async ()=>{
+      await api('/api/cashflow/' + id, { method:'DELETE' });
+      ddsRefreshOpen();
+    });
+  }
+});
+
+document.addEventListener('click', (e)=>{
+  const openLeft = e.target.closest('#dds-add-left');
+  const openRight = e.target.closest('#dds-add-right');
+  if (openLeft){ e.preventDefault(); ddsModalOpen('left'); }
+  if (openRight){ e.preventDefault(); ddsModalOpen('right'); }
+  const close = e.target.closest('#dds-modal-close, #dds-modal-cancel');
+  if (close){ e.preventDefault(); ddsModalClose(); }
+});
+
+document.getElementById('dds-modal-save')?.addEventListener('click', async ()=>{
+  const date = document.getElementById('dds_date').value || new Date().toISOString().slice(0,10);
+  const typeRaw = document.getElementById('dds_type').value || 'income';
+  const type = (typeRaw === 'expense' || typeRaw === 'income') ? typeRaw : 'income';
+  const amount = ddsToNum(document.getElementById('dds_amount').value);
+  const categoryRaw = document.getElementById('dds_category').value || '';
+  const category = categoryRaw.trim() || 'Прочее';
+  const paymentRaw = document.getElementById('dds_payment').value || 'bank';
+  const payment = ['cash','card','transfer','bank'].includes(paymentRaw) ? paymentRaw : 'bank';
+  const comment = document.getElementById('dds_comment').value || '';
+
+  try{
+    const res = await api('/api/cashflow', {
+      method:'POST',
+      body: JSON.stringify({
+        date,
+        type,
+        amount,
+        category,
+        payment_method: payment,
+        comment
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    ddsModalClose();
+    ddsRefreshOpen();
+  }catch(err){
+    console.error(err);
+    alert('Не удалось сохранить проводку');
+  }
+});
+
+document.getElementById('dds-modal-backdrop')?.addEventListener('click', (e)=>{
+  if (e.target && e.target.id === 'dds-modal-backdrop') ddsModalClose();
+});
+
 /* ===== СТАТИСТИКА ===== */
 function loadStats(){
   const resultEl = document.getElementById('stats-result');
@@ -835,25 +1246,29 @@ function loadStats(){
     document.getElementById('products-left').style.display='none';
     document.getElementById('stats-left').style.display='none';
     document.getElementById('orders-left').style.display='none';
+    document.getElementById('dds-left').style.display='none';
     const el=document.getElementById(section+'-left'); if(el) el.style.display='block';
     if(section==='products') loadProductsShortInto('products-left-table','products-pane-left');
     if(section==='stats') populateStatProductsLeft();
     if(section==='orders'){ loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); wireOrderSort('#orders-left-table', currentSortLeft, ()=>loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft)); }
+    if(section==='dds'){ loadDds('left'); }
   }
   function backToMenuLeft(){
     document.getElementById('left-menu').style.display='block';
     document.getElementById('products-left').style.display='none';
     document.getElementById('stats-left').style.display='none';
     document.getElementById('orders-left').style.display='none';
+    document.getElementById('dds-left').style.display='none';
   }
   document.getElementById('open-products-left').addEventListener('click', ()=>showLeft('products'));
   document.getElementById('open-stats-left').addEventListener('click', ()=>showLeft('stats'));
   document.getElementById('open-orders-left').addEventListener('click', ()=>showLeft('orders'));
   const ddsLeft = document.getElementById('open-dds-left');
-  if (ddsLeft) ddsLeft.addEventListener('click', ()=>alert("Раздел \"ДДС\" в разработке"));
+  if (ddsLeft) ddsLeft.addEventListener('click', ()=>showLeft('dds'));
   document.getElementById('close-products-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-stats-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-orders-left').addEventListener('click', backToMenuLeft);
+  document.getElementById('close-dds-left').addEventListener('click', backToMenuLeft);
 
   async function populateStatProductsLeft(){ return; }
 async function loadStatsLeft(){
@@ -965,22 +1380,27 @@ async function loadStatsLeft(){
     document.getElementById('products-right').style.display='none';
     document.getElementById('stats-right').style.display='none';
     document.getElementById('orders-right').style.display='none';
+    document.getElementById('dds-right').style.display='none';
     const el=document.getElementById(section+'-right'); if(el) el.style.display='block';
     if(section==='products') loadProductsShortInto('products-table','products-pane');
     if(section==='stats') populateStatProducts();
     if(section==='orders'){ loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight); wireOrderSort('#orders-right-table', currentSortRight, ()=>loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight)); }
+    if(section==='dds'){ loadDds('right'); }
   }
-  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; }
+  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; document.getElementById('dds-right').style.display='none'; }
 
   document.getElementById('open-products').addEventListener('click', ()=>showRight('products'));
   document.getElementById('open-stats').addEventListener('click', ()=>showRight('stats'));
   document.getElementById('open-orders-right').addEventListener('click', ()=>showRight('orders'));
   const ddsRight = document.getElementById('open-dds');
-  if (ddsRight) ddsRight.addEventListener('click', ()=>alert("Раздел \"ДДС\" в разработке"));
+  if (ddsRight) ddsRight.addEventListener('click', ()=>showRight('dds'));
   document.getElementById('close-products').addEventListener('click', backToMenu);
   document.getElementById('close-stats').addEventListener('click', backToMenu);
   document.getElementById('close-orders-right').addEventListener('click', backToMenu);
+  document.getElementById('close-dds-right').addEventListener('click', backToMenu);
   document.getElementById('load-stats').addEventListener('click', async (ev)=>{ await withOverlay(ev.currentTarget, async ()=>{ await loadStats(); }); });
+  document.getElementById('dds-apply-left').addEventListener('click', ()=>loadDds('left'));
+  document.getElementById('dds-apply-right').addEventListener('click', ()=>loadDds('right'));
 
   document.getElementById('reload-orders-left').addEventListener('click', async (ev)=>{
     await withOverlay(ev.currentTarget, async ()=>{ ordersCache=[]; await loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); });

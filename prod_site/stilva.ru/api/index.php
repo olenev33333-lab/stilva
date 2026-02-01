@@ -32,6 +32,52 @@ function out($code, $data=null){
   exit;
 }
 
+function cf_find_order_income(PDO $pdo, int $orderId){
+  $stmt = $pdo->prepare("SELECT * FROM cashflow_entries WHERE order_id = :oid AND source = 'order' AND type = 'income' LIMIT 1");
+  $stmt->execute([':oid'=>$orderId]);
+  return $stmt->fetch();
+}
+
+function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount){
+  $row = cf_find_order_income($pdo, $orderId);
+  $today = date('Y-m-d');
+  if ($row){
+    $stmt = $pdo->prepare("UPDATE cashflow_entries SET amount = :amt, status = 'active', date = :d, updated_at = NOW() WHERE id = :id");
+    $stmt->execute([':amt'=>$amount, ':d'=>$today, ':id'=>$row['id']]);
+  } else {
+    $stmt = $pdo->prepare("INSERT INTO cashflow_entries (date, type, amount, category, payment_method, comment, order_id, source, status)
+      VALUES (:d, 'income', :amt, :cat, :pm, :cmt, :oid, 'order', 'active')");
+    $stmt->execute([
+      ':d'   => $today,
+      ':amt' => $amount,
+      ':cat' => 'Продажа',
+      ':pm'  => 'bank',
+      ':cmt' => 'Заказ #'.$orderId,
+      ':oid' => $orderId,
+    ]);
+  }
+}
+
+function cf_void_order_income(PDO $pdo, int $orderId){
+  $row = cf_find_order_income($pdo, $orderId);
+  if ($row){
+    $stmt = $pdo->prepare("UPDATE cashflow_entries SET status = 'void', updated_at = NOW() WHERE id = :id");
+    $stmt->execute([':id'=>$row['id']]);
+  }
+}
+
+function cf_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newStatus, float $total){
+  try {
+    if ($newStatus === 'Выполнен'){
+      cf_upsert_order_income($pdo, $orderId, $total);
+    } elseif ($prevStatus === 'Выполнен' && $newStatus !== 'Выполнен') {
+      cf_void_order_income($pdo, $orderId);
+    }
+  } catch (Throwable $e) {
+    // intentionally ignore to avoid breaking order flow
+  }
+}
+
 $uri = strtok($_SERVER['REQUEST_URI'], '?');
 $method = $_SERVER['REQUEST_METHOD'];
 $base = '/api';
@@ -186,6 +232,10 @@ try {
 
       if ($method === 'PATCH'){
         $b = read_json();
+        $stmt = $pdo->prepare("SELECT id, total, status FROM orders WHERE id = :id");
+        $stmt->execute([':id'=>$id]);
+        $prev = $stmt->fetch();
+        if (!$prev) out(404, ['error'=>'nf']);
         $fields = ['note','cancel_reason','customer_name','phone','email','total','status'];
         $set = [];
         $args = [':id'=>$id];
@@ -199,6 +249,9 @@ try {
         $sql = "UPDATE orders SET ".implode(',', $set)." WHERE id = :id";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($args);
+        $newStatus = array_key_exists('status', $b) ? (string)$b['status'] : (string)$prev['status'];
+        $newTotal  = array_key_exists('total', $b) ? (float)$b['total'] : (float)$prev['total'];
+        cf_sync_order($pdo, $id, (string)$prev['status'], $newStatus, $newTotal);
         out(200, ['ok'=>true]);
       }
 
@@ -214,9 +267,163 @@ try {
       $b = read_json();
       $st = $b['status'] ?? null;
       if (!$st) out(400, ['error'=>'no_status']);
+      $stmt = $pdo->prepare("SELECT id, total, status FROM orders WHERE id = :id");
+      $stmt->execute([':id'=>$id]);
+      $prev = $stmt->fetch();
+      if (!$prev) out(404, ['error'=>'nf']);
       $stmt = $pdo->prepare("UPDATE orders SET status = :s WHERE id = :id");
       $stmt->execute([':s'=>$st, ':id'=>$id]);
+      cf_sync_order($pdo, $id, (string)$prev['status'], (string)$st, (float)$prev['total']);
       out(200, ['ok'=>true]);
+    }
+
+    out(404, ['error'=>'nf']);
+  }
+
+  if (($segments[0] ?? '') === 'cashflow'){
+    $pdo = db();
+    $sub = $segments[1] ?? '';
+
+    if ($sub === 'categories'){
+      if ($method === 'GET'){
+        $type = $_GET['type'] ?? null;
+        if ($type){
+          $stmt = $pdo->prepare("SELECT * FROM cashflow_categories WHERE type = :t AND active = 1 ORDER BY name ASC");
+          $stmt->execute([':t'=>$type]);
+        } else {
+          $stmt = $pdo->query("SELECT * FROM cashflow_categories WHERE active = 1 ORDER BY type ASC, name ASC");
+        }
+        out(200, $stmt->fetchAll());
+      }
+
+      if ($method === 'POST'){
+        $b = read_json();
+        $name = trim((string)($b['name'] ?? ''));
+        $type = (string)($b['type'] ?? '');
+        if ($name === '' || !in_array($type, ['income','expense'], true)) out(400, ['error'=>'bad']);
+        $stmt = $pdo->prepare("INSERT INTO cashflow_categories (name, type, active) VALUES (:n,:t,1)");
+        $stmt->execute([':n'=>$name, ':t'=>$type]);
+        out(200, ['id'=>(int)$pdo->lastInsertId()]);
+      }
+
+      out(404, ['error'=>'nf']);
+    }
+
+    if ($method === 'GET' && count($segments) === 1){
+      $from = $_GET['from'] ?? null;
+      $to   = $_GET['to'] ?? null;
+      $type = $_GET['type'] ?? null;
+      $status = $_GET['status'] ?? null;
+      $category = $_GET['category'] ?? null;
+      $payment = $_GET['payment'] ?? null;
+
+      $conds = [];
+      $args = [];
+      if ($from){ $conds[] = "date >= :from"; $args[':from'] = $from; }
+      if ($to){   $conds[] = "date <= :to";   $args[':to']   = $to; }
+      if ($type){ $conds[] = "type = :t";     $args[':t']    = $type; }
+      if ($status){ $conds[] = "status = :st"; $args[':st'] = $status; }
+      if ($category){ $conds[] = "category = :cat"; $args[':cat'] = $category; }
+      if ($payment){ $conds[] = "payment_method = :pm"; $args[':pm'] = $payment; }
+      $where = $conds ? ('WHERE '.implode(' AND ', $conds)) : '';
+
+      $stmt = $pdo->prepare("SELECT * FROM cashflow_entries $where ORDER BY date DESC, id DESC");
+      $stmt->execute($args);
+      $rows = $stmt->fetchAll();
+      out(200, $rows);
+    }
+
+    if ($method === 'POST' && count($segments) === 1){
+      $b = read_json();
+      $date = (string)($b['date'] ?? '');
+      $type = (string)($b['type'] ?? '');
+      $amount = isset($b['amount']) ? (float)$b['amount'] : 0.0;
+      $category = trim((string)($b['category'] ?? ''));
+      $payment = (string)($b['payment_method'] ?? '');
+      $comment = (string)($b['comment'] ?? '');
+      $status = (string)($b['status'] ?? 'active');
+      $source = (string)($b['source'] ?? 'manual');
+      $orderId = isset($b['order_id']) && is_numeric($b['order_id']) ? (int)$b['order_id'] : null;
+
+      if ($date === '') $date = date('Y-m-d');
+      if (!in_array($type, ['income','expense'], true)) $type = 'income';
+      if ($category === '') $category = 'Прочее';
+      if (!in_array($payment, ['cash','card','transfer','bank'], true)) $payment = 'bank';
+      if (!in_array($status, ['active','void'], true)) $status = 'active';
+      if (!in_array($source, ['manual','order'], true)) $source = 'manual';
+
+      $stmt = $pdo->prepare("INSERT INTO cashflow_entries (date, type, amount, category, payment_method, comment, order_id, source, status)
+        VALUES (:d, :t, :amt, :cat, :pm, :cmt, :oid, :src, :st)");
+      $stmt->execute([
+        ':d'=>$date,
+        ':t'=>$type,
+        ':amt'=>$amount,
+        ':cat'=>$category,
+        ':pm'=>$payment,
+        ':cmt'=>$comment,
+        ':oid'=>$orderId,
+        ':src'=>$source,
+        ':st'=>$status,
+      ]);
+      out(200, ['id'=>(int)$pdo->lastInsertId()]);
+    }
+
+    if (count($segments) === 2){
+      $id = (int)$segments[1];
+
+      if ($method === 'PATCH'){
+        $b = read_json();
+        $set = [];
+        $args = [':id'=>$id];
+
+        if (array_key_exists('date', $b)){
+          $set[] = "date = :date";
+          $args[':date'] = (string)$b['date'] ?: date('Y-m-d');
+        }
+        if (array_key_exists('type', $b)){
+          $t = (string)$b['type'];
+          if (!in_array($t, ['income','expense'], true)) $t = 'income';
+          $set[] = "type = :type";
+          $args[':type'] = $t;
+        }
+        if (array_key_exists('amount', $b)){
+          $set[] = "amount = :amount";
+          $args[':amount'] = (float)$b['amount'];
+        }
+        if (array_key_exists('category', $b)){
+          $cat = trim((string)$b['category']);
+          $set[] = "category = :category";
+          $args[':category'] = ($cat === '' ? 'Прочее' : $cat);
+        }
+        if (array_key_exists('payment_method', $b)){
+          $pm = (string)$b['payment_method'];
+          if (!in_array($pm, ['cash','card','transfer','bank'], true)) $pm = 'bank';
+          $set[] = "payment_method = :pm";
+          $args[':pm'] = $pm;
+        }
+        if (array_key_exists('comment', $b)){
+          $set[] = "comment = :comment";
+          $args[':comment'] = (string)$b['comment'];
+        }
+        if (array_key_exists('status', $b)){
+          $st = (string)$b['status'];
+          if (!in_array($st, ['active','void'], true)) $st = 'active';
+          $set[] = "status = :status";
+          $args[':status'] = $st;
+        }
+
+        if (!$set) out(400, ['error'=>'no_fields']);
+        $sql = "UPDATE cashflow_entries SET ".implode(',', $set)." WHERE id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($args);
+        out(200, ['ok'=>true]);
+      }
+
+      if ($method === 'DELETE'){
+        $stmt = $pdo->prepare("DELETE FROM cashflow_entries WHERE id = :id");
+        $stmt->execute([':id'=>$id]);
+        out(200, ['ok'=>true]);
+      }
     }
 
     out(404, ['error'=>'nf']);
