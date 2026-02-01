@@ -1,0 +1,1534 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Админка</title>
+  <style>
+    :root{
+      --bg:#f7f8fa; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e5e7eb;
+      --accent:#0ea5e9; --success:#16a34a; --danger:#dc2626;
+      --shadow:0 10px 30px rgba(0,0,0,.06);
+      --btn:#e5e7eb; --btnText:#111; --btnHover:#d1d5db;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text)}
+    header{padding:16px 24px;border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center}
+    .wrap{max-width:100%;margin:0;padding:20px clamp(12px, 4vw, 32px)}
+
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+    @media (max-width:1100px){.split{grid-template-columns:1fr}}
+
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:240px;position:relative}
+    .card-head{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+    .card-title{font-size:18px;font-weight:800;margin:0;margin-right:auto}
+    .card-body{position:relative;min-height:160px}
+
+    table{width:100%;border-collapse:collapse;background:#fff;table-layout:fixed}
+    thead th{position:sticky;top:0;background:#f8fafc;border-bottom:1px solid var(--line);z-index:1}
+    th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;vertical-align:top}
+    .cell-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .cell-wrap{white-space:normal;overflow:visible;word-break:break-word}
+    td.actions{width:150px}
+    td.actions .btns{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+    .scroll-area{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:64vh;background:#fff;position:relative}
+    .scroll-area{scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+    .scroll-area::-webkit-scrollbar{width:10px;height:10px}
+    .scroll-area::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}
+    .scroll-area::-webkit-scrollbar-track{background:transparent}
+
+    input,select,textarea{background:#fff;color:#0f172a;border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+    select, input, textarea{transition:box-shadow .15s ease, transform .06s ease}
+    select:focus, input:focus, textarea:focus{box-shadow:0 0 0 3px rgba(14,165,233,.2)}
+    button{background:var(--success);border:none;color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700;transition:transform .06s ease, opacity .2s}
+    button:active{transform:translateY(1px)}
+    .danger{background:#ef4444}
+    .ghost{background:var(--btn);color:var(--btnText)}
+    .ghost:hover{background:var(--btnHover)}
+    .muted{color:var(--muted);font-size:12px}
+
+    .pane-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.14);backdrop-filter:saturate(120%) blur(1px);z-index:99;opacity:0;transform:scale(.98);transition:opacity .12s ease, transform .12s ease;pointer-events:none}
+    .pane-overlay.active{opacity:1;transform:scale(1);pointer-events:auto}
+    .pane-spinner{width:36px;height:36px;border-radius:50%;border:3px solid rgba(34,197,94,.35);border-top-color:var(--success);animation:spin .6s linear infinite;box-shadow:0 2px 10px rgba(34,197,94,.25)}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .bigmenu{display:grid;gap:12px}
+    .bigmenu button{width:100%;padding:20px 18px;border-radius:16px;font-size:18px;font-weight:800;background:var(--btn);color:var(--btnText);box-shadow:0 10px 24px rgba(0,0,0,.04)}
+    .bigmenu button:hover{background:var(--btnHover)}
+    .bigmenu button.disabled{opacity:.55;cursor:not-allowed}
+
+    .th-sort{cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+    .th-sort .carret{width:10px;height:10px;display:inline-block;border-right:2px solid #94a3b8;border-bottom:2px solid #94a3b8;transform:rotate(45deg);opacity:.6}
+    .th-sort.asc .carret{transform:rotate(225deg)}
+    .th-sort.desc .carret{transform:rotate(45deg)}
+
+    .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.35);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:10000}
+    .modal{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.2);width: min(1800px, calc(100vw - 48px));max-height:88vh;overflow:auto;padding:16px}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .close-x{background:transparent;border:none;font-size:22px;cursor:pointer;color:#111}
+
+    .mini-table{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;font-size:13px}
+    .mini-table .head{font-weight:700;color:#334155}
+  
+    .cancel-note{color: var(--danger); font-weight: 800; text-transform: uppercase; margin-top:10px; font-size: 12px;}
+    #order-modal-backdrop .modal{
+  width: min(920px, 96vw);
+  max-height: 86vh; /* чтобы совпадало по высоте с товарными модалками */
+}
+/* Сузить выпадашку статуса в таблицах заказов */
+#orders-right-table td:nth-child(5) select,
+#orders-left-table  td:nth-child(5) select {
+  width: 132px !important;     /* при необходимости поменяй на 120–140 */
+  min-width: 132px !important;
+  max-width: 132px !important;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+  </style>
+<style>
+/* ===== Stats UI (pretty but restrained) ===== */
+.stats-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+.stat-card{position:relative;background:linear-gradient(180deg,#f7fbff, #ffffff);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 8px 20px rgba(2,6,23,.05)}
+.stat-card::after{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:#93c5fd;border-radius:12px 12px 0 0;opacity:.35}
+.stat-title{font-size:12px;color:var(--muted);letter-spacing:.02em}
+.stat-value{font-size:22px;font-weight:800;margin-top:4px}
+
+.stats-lists{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.list-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 8px 20px rgba(2,6,23,.04)}
+.list-title{font-weight:800;margin:0 0 8px 0;color:#0f172a;font-size:14px}
+.stat-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.stat-list li{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px dashed #e5e7eb;padding:6px 0}
+.stat-list li:last-child{border-bottom:none}
+.stat-list b{font-variant-numeric:tabular-nums}
+
+@media (max-width: 900px){
+  .stats-lists{grid-template-columns:1fr}
+}
+/* ===== /Stats UI ===== */
+</style>
+
+  <style>
+  .admin-header { position: relative; }
+  .admin-header .logout-link{
+    position: absolute;
+    right: 16px; top: 50%; transform: translateY(-50%);
+    padding: 8px 12px; border-radius: 10px;
+    background: #ef4444; color: #fff; text-decoration: none; font-weight: 700;
+    line-height: 1; opacity: .95;
+  }
+  .admin-header .logout-link:hover { opacity: 1; }
+  @media (max-width: 640px){ .admin-header .logout-link{ right:10px; padding:8px 10px } }
+  /* === Stats: уменьшение типографики под размер «Заказов» === */
+#stats-pane, #stats-pane-left {           /* базовый текст блока */
+  font-size: 14px;                        /* как в заказах */
+}
+
+/* заголовки мини-карт и списков — на полтона меньше */
+#stats-pane .list-title, 
+#stats-pane-left .list-title { 
+  font-size: 13px; 
+}
+
+/* подписи в KPI-карточках */
+#stats-pane .stat-title, 
+#stats-pane-left .stat-title {
+  font-size: 11px;
+}
+
+/* крупные значения KPI, чтобы оставались читаемыми, но без крика */
+#stats-pane .stat-value, 
+#stats-pane-left .stat-value {
+  font-size: 18px;
+}
+
+/* чуть компактнее карточки, чтобы все дышало ровнее */
+#stats-pane .stat-card, 
+#stats-pane-left .stat-card {
+  padding: 10px;
+}
+/* Шапка статистики в одну строку + ужимаем селект статусов */
+#stats-right .card-head > div,
+#stats-left  .card-head > div {
+  flex-wrap: nowrap !important; /* бьём inline flex-wrap:wrap */
+  gap: 6px;                     /* было 8px — чуть компактнее */
+}
+
+#stat-status,
+#stat-status-left {
+  width: 150px;      /* подгони при желании: 140–170px */
+  min-width: 150px;  /* фиксируем, чтобы не плясал */
+}
+
+/* На узких экранах всё равно разрешаем перенос */
+@media (max-width: 1200px){
+  #stats-right .card-head > div,
+  #stats-left  .card-head > div { flex-wrap: wrap !important; }
+}
+
+</style>
+
+<style>
+/* ===== Row status highlighting across the whole admin (all dates) ===== */
+#orders-left-table tbody tr.status-new,
+#orders-right-table tbody tr.status-new { background:#f0fdf4; }         /* very pale green */
+
+#orders-left-table tbody tr.status-critical,
+#orders-right-table tbody tr.status-critical,
+#orders-left-table tbody tr.status-cancelled,
+#orders-right-table tbody tr.status-cancelled { background:#fef2f2; }   /* very pale red */
+</style>
+<style>
+#orders-left-table tbody tr.status-inprogress,
+#orders-right-table tbody tr.status-inprogress { background:#fefce8; } /* very pale yellow */
+</style>
+
+
+</head>
+<body>
+<header class="admin-header"><strong>Админ-панель</strong><div id="whoami" class="muted"></div><a href="?logout=1" class="logout-link">Выйти</a></header>
+
+<div class="wrap">
+  <div class="split">
+
+    <!-- ЛЕВАЯ ПОЛОВИНА: Заказы -->
+<section class="card" id="left-card">
+  <div class="pane-overlay"><div class="pane-spinner"></div></div>
+
+  <div id="left-menu">
+    <h3 class="card-title" style="margin-bottom:12px">Разделы</h3>
+    <div class="bigmenu">
+      <button class="ghost" id="open-products-left">Товары</button>
+      <button class="ghost" id="open-stats-left">Статистика</button>
+      <button class="ghost" id="open-orders-left">Заказы</button>
+      <button class="ghost" id="open-dds-left">ДДС</button>
+    </div>
+  </div>
+
+  <div id="products-left" style="display:none">
+    <div class="card-head" style="margin-top:-8px">
+      <h3 class="card-title">Товары</h3>
+      <button id="add-product-left">+ Товар</button>
+      <button class="ghost" id="close-products-left">Закрыть</button>
+    </div>
+    <div class="card-body">
+      <div class="scroll-area" id="products-pane-left">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <table id="products-left-table">
+          <colgroup>
+            <col style="width:70px"><col style="width:420px"><col style="width:120px"><col style="width:140px"><col style="width:150px">
+          </colgroup>
+          <thead>
+          <tr>
+            <th>ID</th><th>Название</th><th>Цена</th><th>В наличии</th><th>Срок, дн.</th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="stats-left" style="display:none">
+    <div class="card-head" style="margin-top:-8px">
+      <h3 class="card-title">Статистика</h3>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="from-left" type="date"><input id="to-left" type="date">
+        <select id="stat-status-left" title="Статус">
+          <option value="">Статусы: все</option><option value="Выполнен">Только выполненные</option><option value="Новый">Только новые</option><option value="В работе">Только в работе</option><option value="Критическое ожидание">Только критическое ожидание</option><option value="Отменен">Только отмененные</option>
+        </select>
+        <button id="load-stats-left" class="ghost">Показать</button>
+        <button id="export-stats" class="ghost">Скачать Excel</button>
+        <button class="ghost" id="close-stats-left">Закрыть</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="scroll-area" id="stats-pane-left" style="padding:12px">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <div id="stats-result-left" class="muted"></div>
+        <div id="top-customers-left" class="muted" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="orders-left" style="display:none">
+    <div class="card-head" style="margin-top:-8px">
+      <h3 class="card-title">Заказы</h3>
+      <select id="status-filter-left" title="Фильтр по статусу">
+        <option value="">Все</option><option>Новый</option><option>В работе</option><option>Критическое ожидание</option><option>Выполнен</option><option>Отменен</option>
+      </select>
+      <button id="reload-orders-left" class="ghost">Обновить</button>
+      <button id="export-orders-left" class="ghost">Скачать Excel</button>
+      <button class="ghost" id="close-orders-left">Закрыть</button>
+    </div>
+    <div class="card-body">
+      <div class="scroll-area" id="orders-left-pane">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <table id="orders-left-table">
+          <colgroup>
+            <col style="width:64px"><col style="width:120px"><col style="width:220px"><col style="width:90px"><col style="width:140px"><col style="width:160px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th><span class="th-sort" data-col="id">№ <i class="carret"></i></span></th>
+              <th><span class="th-sort" data-col="created_at">Дата <i class="carret"></i></span></th>
+              <th><span class="th-sort" data-col="customer">Клиент <i class="carret"></i></span></th>
+              <th><span class="th-sort" data-col="total">Сумма <i class="carret"></i></span></th>
+              <th><span class="th-sort" data-col="status">Статус <i class="carret"></i></span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+    <!-- ПРАВАЯ ПОЛОВИНА -->
+    <section class="card" id="right-card">
+      <div class="pane-overlay"><div class="pane-spinner"></div></div>
+
+      <div id="right-menu">
+        <h3 class="card-title" style="margin-bottom:12px">Разделы</h3>
+        <div class="bigmenu">
+          <button class="ghost" id="open-products">Товары</button>
+          <button class="ghost" id="open-stats">Статистика</button>
+          <button class="ghost" id="open-orders-right">Заказы</button>
+          <button class="ghost" id="open-dds">ДДС</button>
+        </div>
+      </div>
+
+      <div id="products-right" style="display:none">
+        <div class="card-head" style="margin-top:-8px">
+          <h3 class="card-title">Товары</h3>
+          <button id="add-product-right">+ Товар</button>
+          <button class="ghost" id="close-products">Закрыть</button>
+        </div>
+        <div class="card-body">
+          <div class="scroll-area" id="products-pane">
+            <div class="pane-overlay"><div class="pane-spinner"></div></div>
+            <table id="products-table">
+              <colgroup>
+                <col style="width:70px"><col style="width:420px"><col style="width:120px"><col style="width:140px"><col style="width:150px">
+              </colgroup>
+              <thead>
+              <tr>
+                <th>ID</th><th>Название</th><th>Цена</th><th>В наличии</th><th>Срок, дн.</th>
+              </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="stats-right" style="display:none">
+        <div class="card-head" style="margin-top:-8px">
+          <h3 class="card-title">Статистика</h3>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="from" type="date"><input id="to" type="date">
+            <select id="stat-status" title="Статус">
+              <option value="">Статусы: все</option><option value="Выполнен">Только выполненные</option><option value="Новый">Только новые</option><option value="В работе">Только в работе</option><option value="Критическое ожидание">Только критическое ожидание</option><option value="Отменен">Только отмененные</option>
+            </select>
+            <button id="load-stats" class="ghost">Показать</button>
+            <button id="export-stats" class="ghost">Скачать Excel</button>
+            <button class="ghost" id="close-stats">Закрыть</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="scroll-area" id="stats-pane" style="padding:12px">
+            <div class="pane-overlay"><div class="pane-spinner"></div></div>
+            <div id="stats-result" class="muted"></div>
+            <div id="top-customers" class="muted" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="orders-right" style="display:none">
+        <div class="card-head" style="margin-top:-8px">
+          <h3 class="card-title">Заказы</h3>
+          <select id="status-filter-right" title="Фильтр по статусу">
+            <option value="">Все</option><option>Новый</option><option>В работе</option><option>Критическое ожидание</option><option>Выполнен</option><option>Отменен</option>
+          </select>
+          <button id="reload-orders-right" class="ghost">Обновить</button>
+          <button id="export-orders-right" class="ghost">Скачать Excel</button>
+          <button class="ghost" id="close-orders-right">Закрыть</button>
+        </div>
+        <div class="card-body">
+          <div class="scroll-area" id="orders-right-pane">
+            <div class="pane-overlay"><div class="pane-spinner"></div></div>
+            <table id="orders-right-table">
+              <colgroup>
+                <col style="width:64px"><col style="width:120px"><col style="width:220px"><col style="width:90px"><col style="width:140px"><col style="width:160px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th><span class="th-sort" data-col="id">№ <i class="carret"></i></span></th>
+                  <th><span class="th-sort" data-col="created_at">Дата <i class="carret"></i></span></th>
+                  <th><span class="th-sort" data-col="customer">Клиент <i class="carret"></i></span></th>
+                  <th><span class="th-sort" data-col="total">Сумма <i class="carret"></i></span></th>
+                  <th><span class="th-sort" data-col="status">Статус <i class="carret"></i></span></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </div>
+</div>
+
+<!-- Модалка: состав заказа -->
+<div class="modal-backdrop" id="order-modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="order-modal-title">
+    <div class="modal-head">
+      <h3 id="order-modal-title" class="card-title" style="margin:0">Состав заказа</h3>
+      <button class="close-x" id="order-modal-close">✕</button>
+    </div>
+    <div class="scroll-area" style="max-height:72vh">
+      <div style="padding:12px" id="order-modal-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: полный товар -->
+<div class="modal-backdrop" id="product-modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <h3 id="modal-title" class="card-title" style="margin:0">Карточка товара</h3>
+      <button class="close-x" id="modal-close">✕</button>
+    </div>
+    <div class="scroll-area" style="max-height:72vh">
+      <div style="padding:12px">
+        <table id="product-full-table" style="width:100%">
+          <colgroup>
+            <col style="width:70px"><col style="width:220px"><col style="width:100px"><col style="width:70px">
+            <col style="width:240px"><col style="width:90px"><col style="width:130px"><col style="width:140px">
+            <col style="width:110px"><col style="width:110px"><col style="width:120px"><col style="width:130px">
+            <col style="width:auto"><col style="width:180px">
+          </colgroup>
+          <thead>
+          <tr>
+            <th>ID</th><th>Название</th><th>Цена</th><th>Публ.</th><th>Фото URL</th><th>Полок</th>
+            <th>Материал</th><th>Конструкция</th><th>Перфорация</th><th>Толщ., мм</th>
+            <th>В наличии</th><th>Срок, дн.</th><th>Описание</th><th></th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* API */
+  window.api = async (path, opts = {}) => {
+    const res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'x-dev-auth': '1', ...(opts.headers||{}) },
+      ...opts
+    });
+    return res;
+  };
+
+  /* Вуаль */
+  function findOverlayHost(el){ const pane = el.closest?.('.scroll-area'); if(pane) return pane; const card = el.closest?.('.card'); if(card) return card; return document.body; }
+  function showPaneOverlay(el){ const host=findOverlayHost(el); const ov=host.querySelector(':scope > .pane-overlay')||host.querySelector('.pane-overlay'); if(ov) ov.classList.add('active') }
+  function hidePaneOverlay(el){ const host=findOverlayHost(el); const ov=host.querySelector(':scope > .pane-overlay')||host.querySelector('.pane-overlay'); if(ov) ov.classList.remove('active') }
+  async function withOverlay(el, fn){ try{ showPaneOverlay(el); return await fn(); } finally{ hidePaneOverlay(el); } }
+
+/* ==== Cancel helpers ==== */
+const CANCEL_STAMP_PREFIX = 'ОТМЕНЕН ПО ПРИЧИНЕ:';
+function hasCancelStampLine(line){ return /^ОТМЕНЕН\s+ПО\s+ПРИЧИНЕ\s*:/i.test((line||'').trim()); }
+function addCancelStampToNote(prevNote, reason){
+  const clean = (prevNote||'').split(/\r?\n/).filter(l => !hasCancelStampLine(l));
+  const head = (CANCEL_STAMP_PREFIX + ' ' + reason).trim();
+  const tail = clean.filter(l => l.trim() !== '');
+  return [head, ...tail].join('\n');
+}
+function removeCancelStampFromNote(prevNote){
+  return (prevNote||'').split(/\r?\n/).filter(l => !hasCancelStampLine(l)).join('\n');
+}
+function extractCancelReasonFromNote(note){
+  const m = (note||'').match(/ОТМЕНЕН\s+ПО\s+ПРИЧИНЕ\s*:\s*(.+)/i);
+  return m ? m[1].trim() : '';
+}
+
+/* ==== LocalStorage cache for cancel_reason ==== */
+const LS_KEY = 'cancel_reasons_v1';
+function readCRMap(){ try{ return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }catch(_){ return {}; } }
+function writeCRMap(map){ try{ localStorage.setItem(LS_KEY, JSON.stringify(map)); }catch(_){} }
+function setLocalCancel(id, reason, note){ const map = readCRMap(); map[id] = { reason: String(reason||'').trim(), note: String(note||''), ts: Date.now() }; writeCRMap(map); }
+function clearLocalCancel(id){ const map = readCRMap(); if(map[id]){ delete map[id]; writeCRMap(map); } }
+function mergeLocalCancels(list){
+  const map = readCRMap();
+  for(const o of list){
+    if(!o) continue;
+    const id = String(o.id);
+    if((o.status === 'Отменен') && (!o.cancel_reason || !o.note)){
+      if(map[id]){
+        if(!o.cancel_reason) o.cancel_reason = map[id].reason;
+        if(!o.note) o.note = map[id].note;
+      }
+    }else if(o.cancel_reason){
+      setLocalCancel(id, o.cancel_reason, o.note || '');
+    }else if(o.status !== 'Отменен'){
+      clearLocalCancel(id);
+    }
+  }
+}
+
+/* ===== ЗАКАЗЫ ===== */
+let ordersCache = [];
+let currentSortLeft = {col:null, dir:1};
+let currentSortRight = {col:null, dir:1};
+
+function sortOrders(list, sort){
+  const dir = sort.dir; const col=sort.col; if(!col) return list;
+  const getVal = (o)=>{
+    if(col==='id') return Number(o.id)||0;
+    if(col==='created_at') return o.created_at ? new Date(o.created_at).getTime() : 0;
+    if(col==='customer') return (o.customer_name||'') + (o.phone||'') + (o.email||'');
+    if(col==='total') return Number(o.total)||0;
+    if(col==='status') return o.status||'';
+    return 0;
+  };
+  return [...list].sort((a,b)=>{ const av=getVal(a), bv=getVal(b); if(av<bv) return -1*dir; if(av>bv) return 1*dir; return 0; });
+}
+
+function renderOrderRow(o){
+  const tr=document.createElement('tr');
+  tr.innerHTML =
+    '<td class="cell-ellipsis">'+(o.id||'–')+'</td>'+
+    '<td class="cell-wrap">'+(o.created_at ? new Date(o.created_at).toLocaleString() : '—')+'</td>'+
+    '<td class="cell-wrap">'+[(o.customer_name||''),(o.phone||''),(o.email||'')].filter(Boolean).join(' / ')+'</td>'+
+    '<td class="cell-wrap">'+(o.total||0)+'</td>'+
+    '<td><select data-id="'+o.id+'" class="status-select">' + ['Новый','В работе','Критическое ожидание','Выполнен','Отменен'].map(s=>'<option '+(s===(o.status||'')?'selected':'')+'>'+s+'</option>').join('') + '</select></td>'+
+    '<td class="actions"><div class="btns"><button class="ghost open-order" data-id="'+o.id+'">Открыть заказ</button><button class="danger del-order" data-id="'+o.id+'">Удалить</button></div></td>';
+  return tr;
+}
+
+
+function statusClass(s){
+  if(s==='Новый') return 'status-new';
+  if(s==='В работе') return 'status-inprogress';
+  if(s==='Критическое ожидание') return 'status-critical';
+  if(s==='Отменен') return 'status-cancelled';
+  return '';
+}
+function applyRowStatusClass(tr, status){
+  if(!tr) return;
+  tr.classList.remove('status-new','status-inprogress','status-critical','status-cancelled');
+  const c = statusClass(status||'');
+  if(c) tr.classList.add(c);
+}
+
+
+
+async function loadOrdersInto(tbodySel, paneId, statusFilterId, sortState){
+  const tbody=document.querySelector(tbodySel);
+  const pane=document.getElementById(paneId);
+  const filterEl=document.getElementById(statusFilterId);
+  if(!tbody||!pane) return;
+  const cols=document.querySelector('#'+paneId+' table colgroup').children.length;
+  tbody.innerHTML=skeletonRows(cols,8);
+  await withOverlay(pane, async ()=>{
+    const prevCache = ordersCache.slice();
+    const res=await api('/api/orders'); 
+    const fresh = res.ok ? await res.json() : [];
+    mergeLocalCancels(fresh);
+    const byIdPrev = new Map(prevCache.map(o=>[String(o.id), o]));
+    for(const o of fresh){
+      const pid = String(o.id);
+      const prev = byIdPrev.get(pid);
+      if(prev && o.status === 'Отменен'){
+        if(!o.cancel_reason && prev.cancel_reason){ o.cancel_reason = prev.cancel_reason; }
+        if(!o.note && prev.note){ o.note = prev.note; }
+      }
+    }
+    ordersCache = fresh;
+
+    const status=filterEl?filterEl.value:'';
+    let data=status?ordersCache.filter(o=>(o.status||'')===status):ordersCache.slice();
+    data=sortOrders(data, sortState);
+    tbody.innerHTML='';
+    data.forEach(o=>{ const tr = renderOrderRow(o); applyRowStatusClass(tr, o.status||''); tbody.appendChild(tr); });
+
+    tbody.querySelectorAll('.status-select').forEach(sel=>{
+      sel.addEventListener('change', async e=>{
+        const id=e.target.dataset.id, newStatus=e.target.value;
+        await withOverlay(e.target, async ()=>{
+          await api('/api/orders/'+id+'/status',{method:'PATCH', body: JSON.stringify({status:newStatus})});
+          const idx=ordersCache.findIndex(x=>String(x.id)===String(id)); if(idx>-1) ordersCache[idx].status=newStatus; applyRowStatusClass(e.target.closest('tr'), newStatus);
+        });
+      });
+    });
+    tbody.querySelectorAll('.del-order').forEach(btn=>{
+      btn.addEventListener('click', async e=>{
+        const id=e.target.dataset.id;
+        if(confirm('Удалить заказ '+id+'?')){
+          await withOverlay(e.target, async ()=>{
+            await api('/api/orders/'+id,{method:'DELETE'});
+            ordersCache = ordersCache.filter(x=>String(x.id)!==String(id));
+            clearLocalCancel(String(id));
+            await loadOrdersInto(tbodySel,paneId,statusFilterId,sortState);
+          });
+        }
+      });
+    });
+    tbody.querySelectorAll('.open-order').forEach(btn=>{
+      btn.addEventListener('click', e=>{
+        const id=e.target.dataset.id;
+        openOrderById(id);
+      });
+    });
+  });
+}
+
+function wireOrderSort(tableSelector, sortState, refreshFn){
+  const table=document.querySelector(tableSelector);
+  table.querySelectorAll('thead .th-sort').forEach(h=>{
+    h.addEventListener('click', ()=>{
+      const col=h.dataset.col;
+      if(sortState.col===col) sortState.dir*=-1; else {sortState.col=col; sortState.dir=1;}
+      table.querySelectorAll('.th-sort').forEach(x=>x.classList.remove('asc','desc'));
+      h.classList.add(sortState.dir===1?'asc':'desc');
+      refreshFn();
+    });
+  });
+}
+
+/* Модалка заказа */
+const orderModalBackdrop=document.getElementById('order-modal-backdrop');
+const orderModalClose=document.getElementById('order-modal-close');
+const orderModalContent=document.getElementById('order-modal-content');
+
+function openOrderModal(order){
+  const items=Array.isArray(order.items)?order.items:[];
+  const rows=items.map(it=>{
+    const name=it&&it.name?String(it.name):'Товар';
+    const qty=Number(it&&it.qty)||1;
+    const price=Number(it&&it.price)||0;
+    const sum=qty*price;
+    return `<div>${name}</div><div>${qty}</div><div>${price}</div><div>${sum}</div>`;
+  }).join('');
+  const _noteRaw=(order.note||'').trim();
+  const _reason=(order.cancel_reason||'').trim() || extractCancelReasonFromNote(_noteRaw);
+  const reasonHtml = _reason ? `<div class="cancel-note">Отменен по причине: ${_reason}</div>` : '';
+  const otherNote = removeCancelStampFromNote(_noteRaw).trim();
+  const noteHtml = (otherNote ? `<div class="muted" style="margin-top:10px">Примечание: ${otherNote}</div>` : '') + reasonHtml;
+  const total = Number(order.total)||0;
+  orderModalContent.innerHTML = `
+    <div class="mini-table">
+      <div class="head">Наименование</div><div class="head">Кол-во</div><div class="head">Цена</div><div class="head">Сумма</div>
+      ${rows || '<div>—</div><div></div><div></div><div></div>'}
+    </div>
+    <div style="margin-top:12px"><strong>Итого по заказу:</strong> ${total} ₽</div>
+    ${noteHtml}
+  `;
+  orderModalBackdrop.style.display='flex';
+}
+function closeOrderModal(){ orderModalBackdrop.style.display='none'; orderModalContent.innerHTML=''; }
+orderModalClose.addEventListener('click', closeOrderModal);
+orderModalBackdrop.addEventListener('click', e=>{ if(e.target===orderModalBackdrop) closeOrderModal() });
+
+// Гидратация полного заказа перед открытием модалки
+async function openOrderById(id){
+  let ord = ordersCache.find(x=>String(x.id)===String(id));
+  try{
+    const res = await api('/api/orders/'+id);
+    if(res.ok){
+      const full = await res.json();
+      if(ord){ Object.assign(ord, full); }
+      else { ord = full; ordersCache.push(full); }
+      if(ord.status === 'Отменен'){
+        const reason = (ord.cancel_reason||'') || extractCancelReasonFromNote(ord.note||'');
+        setLocalCancel(String(id), reason, ord.note||'');
+      }
+    }
+  }catch(e){}
+  if(ord) openOrderModal(ord);
+}
+
+
+/* ===== ТОВАРЫ (списки + открытие модалки редактирования) ===== */
+let productsCache = [];
+
+async function loadProductsShortInto(tableId, paneId){
+  const tbody = document.querySelector('#'+tableId+' tbody');
+  const pane = document.getElementById(paneId);
+  if(!tbody || !pane) return;
+  const cols = document.querySelector('#'+tableId+' colgroup').children.length;
+  tbody.innerHTML = skeletonRows(cols, 10);
+  await withOverlay(pane, async ()=>{
+    if(!productsCache.length){
+      const res = await api('/api/products');
+      productsCache = res.ok ? await res.json() : [];
+    }
+    tbody.innerHTML = '';
+    productsCache.forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="cell-ellipsis">'+(p.id||'')+'</td>'+
+        '<td class="cell-ellipsis">'+(p.name||'')+'</td>'+
+        '<td class="cell-ellipsis">'+(p.price||0)+'</td>'+
+        '<td class="cell-ellipsis">'+(p.stock_qty ?? 0)+'</td>'+
+        '<td class="cell-ellipsis">'+(p.lead_time_days ?? '')+'</td>';
+      tr.addEventListener('click', ()=> openEditById(p.id));
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+async function openEditById(id){
+  if(!id) return;
+  if(!productsCache.length){
+    const r = await api('/api/products');
+    productsCache = r.ok ? await r.json() : [];
+  }
+  let p = productsCache.find(x => String(x.id) === String(id));
+  if(!p){
+    try{ const r = await api('/api/products/'+id); if(r.ok) p = await r.json(); }catch(_){}
+  }
+  if(window.__openEditProduct) window.__openEditProduct(p || {id});
+}
+/* ===== /ТОВАРЫ ===== */
+
+/* === helper: load items for orders when /api/orders returns trimmed objects === */
+const __itemsCache = new Map();
+async function ensureItems(orders){
+  if(!Array.isArray(orders) || !orders.length) return;
+  const need = orders.filter(o => !Array.isArray(o.items) || o.items.length === 0);
+  if(!need.length) return;
+  await Promise.all(need.map(async o => {
+    const key = String(o.id);
+    if(__itemsCache.has(key)){ o.items = __itemsCache.get(key); return; }
+    try{
+      const r = await api('/api/orders/' + key);
+      if(r.ok){
+        const full = await r.json();
+        const items = Array.isArray(full.items) ? full.items : [];
+        __itemsCache.set(key, items);
+        o.items = items;
+      }
+    }catch(_){ /* тихо */ }
+  }));
+}
+
+/* ===== СТАТИСТИКА ===== */
+function loadStats(){
+  const resultEl = document.getElementById('stats-result');
+  const topEl    = document.getElementById('top-customers');
+  const pane     = document.getElementById('stats-pane');
+  resultEl.innerHTML = '<span class="muted">...</span>';
+  topEl.innerHTML    = '<span class="muted">...</span>';
+
+  const toNum = v => {
+    if (v == null) return 0;
+    const s = String(v).replace(/\s+/g,'').replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const fmt = v => toNum(v).toLocaleString('ru-RU',{minimumFractionDigits:2, maximumFractionDigits:2});
+
+  return withOverlay(pane, async ()=>{
+    const from = document.getElementById('from').value;
+    const to   = document.getElementById('to').value;
+    const st   = document.getElementById('stat-status').value;
+
+    // Грузим заказы + весь каталог (каталог нужен, чтобы показать нули)
+    const [resOrders, resProducts] = await Promise.all([api('/api/orders'), api('/api/products')]);
+    if (!resOrders.ok){ resultEl.textContent='Ошибка загрузки'; topEl.textContent=''; return; }
+    const orders   = await resOrders.json();
+    const products = resProducts.ok ? await resProducts.json() : [];
+
+    const fromMs = from ? new Date(from+'T00:00:00').getTime() : -Infinity;
+    const toMs   = to   ? new Date(to  +'T23:59:59').getTime() :  Infinity;
+
+    // Фильтруем ТОЛЬКО по дате и статусу. Фильтра по товару уже нет.
+    const list = orders.filter(o=>{
+      const t = o.created_at ? new Date(o.created_at).getTime() : 0;
+      const inDate   = t >= fromMs && t <= toMs;
+      const byStatus = st ? (o.status === st) : true;
+      return inDate && byStatus;
+    });
+
+    await ensureItems(list);
+
+
+    const totalRevenue = list.reduce((s,o)=> s + toNum(o.total), 0);
+    const ordersCount  = list.length;
+
+    // Топ клиентов (как было)
+    const byCustomer = new Map();
+    list.forEach(o=>{
+      const key = (o.customer_name || 'Без имени') + ' / ' + (o.phone || '—');
+      byCustomer.set(key, (byCustomer.get(key)||0) + toNum(o.total));
+    });
+    const topCustomers = [...byCustomer.entries()].sort((a,b)=> b[1]-a[1]).slice(0,5);
+
+    // Подсчет по всем товарам, включая 0
+    const idToName    = new Map(products.map(p => [String(p.id), (p.name || ('ID '+p.id))]));
+    const countsById  = new Map([...idToName.keys()].map(id => [id, 0]));
+
+    list.forEach(o=>{
+      (o.items || []).forEach(it=>{
+        const id  = String(it.product_id ?? it.productId ?? it.id ?? '');
+        const qty = toNum(it.qty ?? it.quantity ?? 0);
+        if (countsById.has(id)) {
+          countsById.set(id, countsById.get(id) + qty);
+        } else {
+        }
+      });
+    });
+
+    // Преобразуем в [имя, количество], сортируем по количеству. НИЧЕГО не обрезаем.
+    const allProducts = [...countsById.entries()]
+      .map(([idOrName, qty]) => [idToName.get(idOrName) ?? idOrName, qty])
+      .sort((a,b)=> b[1]-a[1]);
+    
+    window.__lastStatsRight = {
+  from, to, st, totalRevenue, ordersCount,
+  topCustomers, allProducts
+};
+
+    resultEl.innerHTML =
+      
+`<div class="stats-kpis">
+  <div class="stat-card"><div class="stat-title">Выручка</div><div class="stat-value">${fmt(totalRevenue)} ₽</div></div>
+  <div class="stat-card"><div class="stat-title">Заказов</div><div class="stat-value">${ordersCount}</div></div>
+  <div class="stat-card"><div class="stat-title">Статус</div><div class="stat-value">${st || 'все'}</div></div>
+  <div class="stat-card"><div class="stat-title">Период</div><div class="stat-value">${from || '—'} — ${to || '—'}</div></div>
+</div>`; resultEl.classList && resultEl.classList.remove('muted');
+
+    topEl.innerHTML =
+      
+`<div class="stats-lists">
+  <div class="list-card">
+    <div class="list-title">Топ клиентов</div>
+    <ol class="stat-list">${
+      topCustomers.length 
+        ? topCustomers.map(([k,v])=> `<li><span>${k}</span><b>${fmt(v)} ₽</b></li>`).join('') 
+        : '<li class="muted">—</li>'
+    }</ol>
+  </div>
+  <div class="list-card">
+    <div class="list-title">Топ товаров</div>
+    <ol class="stat-list">${
+      allProducts.length 
+        ? allProducts.map(([n,q])=> `<li><span>${n}</span><b>${q} шт.</b></li>`).join('') 
+        : '<li class="muted">—</li>'
+    }</ol>
+  </div>
+</div>`; topEl.classList && topEl.classList.remove('muted');
+  });
+}
+
+  /* Левое меню */
+  function showLeft(section){
+    document.getElementById('left-menu').style.display='none';
+    document.getElementById('products-left').style.display='none';
+    document.getElementById('stats-left').style.display='none';
+    document.getElementById('orders-left').style.display='none';
+    const el=document.getElementById(section+'-left'); if(el) el.style.display='block';
+    if(section==='products') loadProductsShortInto('products-left-table','products-pane-left');
+    if(section==='stats') populateStatProductsLeft();
+    if(section==='orders'){ loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); wireOrderSort('#orders-left-table', currentSortLeft, ()=>loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft)); }
+  }
+  function backToMenuLeft(){
+    document.getElementById('left-menu').style.display='block';
+    document.getElementById('products-left').style.display='none';
+    document.getElementById('stats-left').style.display='none';
+    document.getElementById('orders-left').style.display='none';
+  }
+  document.getElementById('open-products-left').addEventListener('click', ()=>showLeft('products'));
+  document.getElementById('open-stats-left').addEventListener('click', ()=>showLeft('stats'));
+  document.getElementById('open-orders-left').addEventListener('click', ()=>showLeft('orders'));
+  const ddsLeft = document.getElementById('open-dds-left');
+  if (ddsLeft) ddsLeft.addEventListener('click', ()=>alert("Раздел \"ДДС\" в разработке"));
+  document.getElementById('close-products-left').addEventListener('click', backToMenuLeft);
+  document.getElementById('close-stats-left').addEventListener('click', backToMenuLeft);
+  document.getElementById('close-orders-left').addEventListener('click', backToMenuLeft);
+
+  async function populateStatProductsLeft(){ return; }
+async function loadStatsLeft(){
+  const resultEl = document.getElementById('stats-result-left');
+  const topEl    = document.getElementById('top-customers-left');
+  const pane     = document.getElementById('stats-pane-left');
+  resultEl.innerHTML = '<span class="muted">...</span>';
+  topEl.innerHTML    = '<span class="muted">...</span>';
+
+  const toNum = v => {
+    if (v == null) return 0;
+    const s = String(v).replace(/\s+/g,'').replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const fmt = v => toNum(v).toLocaleString('ru-RU',{minimumFractionDigits:2, maximumFractionDigits:2});
+
+  await withOverlay(pane, async ()=>{
+    const from = document.getElementById('from-left').value;
+    const to   = document.getElementById('to-left').value;
+    const st   = document.getElementById('stat-status-left').value;
+
+    const [resOrders, resProducts] = await Promise.all([api('/api/orders'), api('/api/products')]);
+    if (!resOrders.ok){ resultEl.textContent='Ошибка загрузки'; topEl.textContent=''; return; }
+    const orders   = await resOrders.json();
+    const products = resProducts.ok ? await resProducts.json() : [];
+
+    const fromMs = from ? new Date(from+'T00:00:00').getTime() : -Infinity;
+    const toMs   = to   ? new Date(to  +'T23:59:59').getTime() :  Infinity;
+
+    const list = orders.filter(o=>{
+      const t = o.created_at ? new Date(o.created_at).getTime() : 0;
+      const inDate   = t >= fromMs && t <= toMs;
+      const byStatus = st ? (o.status === st) : true;
+      return inDate && byStatus;
+    });
+
+    await ensureItems(list);
+
+
+    const totalRevenue = list.reduce((s,o)=> s + toNum(o.total), 0);
+    const ordersCount  = list.length;
+
+    const byCustomer = new Map();
+    list.forEach(o=>{
+      const key = (o.customer_name || 'Без имени') + ' / ' + (o.phone || '—');
+      byCustomer.set(key, (byCustomer.get(key)||0) + toNum(o.total));
+    });
+    const topCustomers = [...byCustomer.entries()].sort((a,b)=> b[1]-a[1]).slice(0,5);
+
+    const idToName   = new Map(products.map(p => [String(p.id), (p.name || ('ID '+p.id))]));
+    const countsById = new Map([...idToName.keys()].map(id => [id, 0]));
+
+    list.forEach(o=>{
+      (o.items || []).forEach(it=>{
+        const id  = String(it.product_id ?? it.productId ?? it.id ?? '');
+        const qty = toNum(it.qty ?? it.quantity ?? 0);
+        if (countsById.has(id)) countsById.set(id, countsById.get(id) + qty);
+        else {
+        }
+      });
+    });
+
+    const allProducts = [...countsById.entries()]
+      .map(([idOrName, qty]) => [idToName.get(idOrName) ?? idOrName, qty])
+      .sort((a,b)=> b[1]-a[1]);
+      
+    window.__lastStatsRight = {
+  from, to, st, totalRevenue, ordersCount,
+  topCustomers, allProducts
+};
+
+    resultEl.innerHTML =
+      
+`<div class="stats-kpis">
+  <div class="stat-card"><div class="stat-title">Выручка</div><div class="stat-value">${fmt(totalRevenue)} ₽</div></div>
+  <div class="stat-card"><div class="stat-title">Заказов</div><div class="stat-value">${ordersCount}</div></div>
+  <div class="stat-card"><div class="stat-title">Статус</div><div class="stat-value">${st || 'все'}</div></div>
+  <div class="stat-card"><div class="stat-title">Период</div><div class="stat-value">${from || '—'} — ${to || '—'}</div></div>
+</div>`; resultEl.classList && resultEl.classList.remove('muted');
+
+    topEl.innerHTML =
+      
+`<div class="stats-lists">
+  <div class="list-card">
+    <div class="list-title">Топ клиентов</div>
+    <ol class="stat-list">${
+      topCustomers.length 
+        ? topCustomers.map(([k,v])=> `<li><span>${k}</span><b>${fmt(v)} ₽</b></li>`).join('') 
+        : '<li class="muted">—</li>'
+    }</ol>
+  </div>
+  <div class="list-card">
+    <div class="list-title">Топ товаров</div>
+    <ol class="stat-list">${
+      allProducts.length 
+        ? allProducts.map(([n,q])=> `<li><span>${n}</span><b>${q} шт.</b></li>`).join('') 
+        : '<li class="muted">—</li>'
+    }</ol>
+  </div>
+</div>`; topEl.classList && topEl.classList.remove('muted');
+  });
+}
+  document.getElementById('load-stats-left').addEventListener('click', async (ev)=>{ await withOverlay(ev.currentTarget, async ()=>{ await loadStatsLeft(); }); });
+
+  /* Правое меню */
+  function showRight(section){
+    document.getElementById('right-menu').style.display='none';
+    document.getElementById('products-right').style.display='none';
+    document.getElementById('stats-right').style.display='none';
+    document.getElementById('orders-right').style.display='none';
+    const el=document.getElementById(section+'-right'); if(el) el.style.display='block';
+    if(section==='products') loadProductsShortInto('products-table','products-pane');
+    if(section==='stats') populateStatProducts();
+    if(section==='orders'){ loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight); wireOrderSort('#orders-right-table', currentSortRight, ()=>loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight)); }
+  }
+  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; }
+
+  document.getElementById('open-products').addEventListener('click', ()=>showRight('products'));
+  document.getElementById('open-stats').addEventListener('click', ()=>showRight('stats'));
+  document.getElementById('open-orders-right').addEventListener('click', ()=>showRight('orders'));
+  const ddsRight = document.getElementById('open-dds');
+  if (ddsRight) ddsRight.addEventListener('click', ()=>alert("Раздел \"ДДС\" в разработке"));
+  document.getElementById('close-products').addEventListener('click', backToMenu);
+  document.getElementById('close-stats').addEventListener('click', backToMenu);
+  document.getElementById('close-orders-right').addEventListener('click', backToMenu);
+  document.getElementById('load-stats').addEventListener('click', async (ev)=>{ await withOverlay(ev.currentTarget, async ()=>{ await loadStats(); }); });
+
+  document.getElementById('reload-orders-left').addEventListener('click', async (ev)=>{
+    await withOverlay(ev.currentTarget, async ()=>{ ordersCache=[]; await loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); });
+  });
+  document.getElementById('status-filter-left').addEventListener('change', ()=>{
+    loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft);
+  });
+  document.getElementById('reload-orders-right').addEventListener('click', async (ev)=>{
+    await withOverlay(ev.currentTarget, async ()=>{ ordersCache=[]; await loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight); });
+  });
+  document.getElementById('status-filter-right').addEventListener('change', ()=>{
+    loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight);
+  });
+
+  async function populateStatProducts(){ return; }
+
+  document.addEventListener('DOMContentLoaded', async ()=>{ backToMenu(); backToMenuLeft(); });
+
+  function skeletonRows(cols, count=6){
+    const tr=[]; for(let i=0;i<count;i++){ const cells=Array.from({length:cols},()=>'<td><span class="muted">...</span></td>').join(''); tr.push('<tr>'+cells+'</tr>');} return tr.join('');
+  }
+
+  (function(){
+    const SEP = '\t';
+    function escapeCell(v){ const s = String(v).replace(/\r?\n|\r/g, ' ').replace(/"/g, '""').trim(); return '"' + s + '"'; }
+    function tableToCSVString(table){
+      const ths = Array.from(table.tHead?.rows?.[0]?.cells || []);
+      const lastH = Math.max(0, ths.length - 1);
+      const header = ths.slice(0, lastH).map(th => escapeCell(th.textContent)).join(SEP);
+      const body = Array.from(table.tBodies?.[0]?.rows || []).map(tr => {
+        const cells = Array.from(tr.cells);
+        const last = Math.max(0, cells.length - 1);
+        const vals = cells.slice(0, last).map(td => {
+          const sel = td.querySelector && td.querySelector('select');
+          return escapeCell(sel ? sel.value : td.textContent);
+        });
+        return vals.join(SEP);
+      });
+      return [header, ...body].join('\r\n');
+    }
+    function csvUTF16LEBlob(csvStr){ const buf = new Uint16Array(csvStr.length + 1); buf[0] = 0xFEFF; for (let i = 0; i < csvStr.length; i++) buf[i+1] = csvStr.charCodeAt(i); return new Blob([buf], { type: 'application/vnd.ms-excel;charset=utf-16le' }); }
+    function downloadBlob(blob, filename){ const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0); }
+    function exportOrders(tableId, prefix){ const table = document.getElementById(tableId); if (!table) return; const csv = tableToCSVString(table); const blob = csvUTF16LEBlob(csv); const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-'); downloadBlob(blob, `${prefix}_${stamp}.xls`); }
+    const btnL = document.getElementById('export-orders-left'); if (btnL && !btnL.dataset.wired){ btnL.dataset.wired='1'; btnL.addEventListener('click', ()=> exportOrders('orders-left-table','orders_left')); }
+    const btnR = document.getElementById('export-orders-right'); if (btnR && !btnR.dataset.wired){ btnR.dataset.wired='1'; btnR.addEventListener('click', ()=> exportOrders('orders-right-table','orders_right')); }
+  })();
+
+  /* === Intercept status change for "Отменен" === */
+  (function(){
+    function showCancelModal(selectEl, orderId){
+      const backdrop = document.getElementById('cancel-modal-backdrop');
+      const txt = document.getElementById('cancel-reason');
+      const btnSave = document.getElementById('cancel-modal-save');
+      const btnCancel = document.getElementById('cancel-modal-cancel');
+      const btnX = document.getElementById('cancel-modal-close');
+
+      function cleanup(){ backdrop.style.display='none'; btnSave.onclick = btnCancel.onclick = btnX.onclick = backdrop.onclick = null; }
+      function revert(){ cleanup(); const prev = selectEl.dataset.prev || ''; selectEl.value = prev || 'Новый'; }
+
+      txt.value='';
+      backdrop.style.display='flex';
+      btnCancel.onclick = revert;
+      btnX.onclick = revert;
+      backdrop.onclick = (ev)=>{ if(ev.target===backdrop) revert(); };
+
+      btnSave.onclick = async ()=>{
+        const reason = txt.value.trim();
+        if(!reason){ txt.focus(); txt.style.boxShadow='0 0 0 3px rgba(220,38,38,.25)'; return; }
+        cleanup();
+        await withOverlay(selectEl, async ()=>{
+          await api('/api/orders/'+orderId+'/status',{method:'PATCH', body: JSON.stringify({status:'Отменен'})});
+          const idx = ordersCache.findIndex(x=>String(x.id)===String(orderId));
+          const prevNote = idx>-1 ? (ordersCache[idx].note||'').trim() : '';
+          const newNote = addCancelStampToNote(prevNote, reason);
+          await api('/api/orders/' + orderId, { method: 'PATCH', body: JSON.stringify({ cancel_reason: reason, note: newNote }) });
+          if(idx>-1){ ordersCache[idx].status='Отменен'; ordersCache[idx].cancel_reason = reason; ordersCache[idx].note = newNote; }
+          setLocalCancel(String(orderId), reason, newNote);
+          selectEl.dataset.prev = 'Отменен'; applyRowStatusClass(selectEl.closest('tr'), 'Отменен');
+        });
+      };
+    }
+
+    document.addEventListener('change', function(e){
+      const sel = e.target.closest && e.target.closest('.status-select');
+      if(!sel) return;
+      if(sel.dataset.skipCancelCheck === '1'){ sel.dataset.skipCancelCheck=''; return; }
+      if(!sel.dataset.prev) sel.dataset.prev = sel.value;
+      const orderId = sel.dataset.id;
+      const val = sel.value;
+      const prev = sel.dataset.prev || '';
+
+      if(val === 'Отменен'){
+        e.stopImmediatePropagation(); e.stopPropagation(); e.preventDefault();
+        showCancelModal(sel, orderId);
+        return;
+      }
+
+      if(prev === 'Отменен' && val !== prev){
+        e.stopImmediatePropagation(); e.stopPropagation(); e.preventDefault();
+        (async ()=>{
+          await withOverlay(sel, async ()=>{
+            const idx = ordersCache.findIndex(x=>String(x.id)===String(orderId));
+            const prevNote = idx>-1 ? (ordersCache[idx].note||'').trim() : '';
+            const cleaned = removeCancelStampFromNote(prevNote);
+            if(cleaned !== prevNote){
+              await api('/api/orders/'+orderId, {method:'PATCH', body: JSON.stringify({ note: cleaned, cancel_reason: '' })});
+              if(idx>-1){ ordersCache[idx].note = cleaned; ordersCache[idx].cancel_reason = ''; }
+            }
+            await api('/api/orders/'+orderId+'/status',{method:'PATCH', body: JSON.stringify({ status: val })});
+            if(idx>-1) ordersCache[idx].status = val;
+            clearLocalCancel(String(orderId));
+            sel.dataset.prev = val; applyRowStatusClass(sel.closest('tr'), val);
+          });
+        })();
+        return;
+      }
+
+      sel.dataset.prev = val;
+    }, true);
+
+  })();
+
+</script>
+
+<div class="modal-backdrop" id="cancel-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title">
+    <div class="modal-head">
+      <h3 id="cancel-modal-title" class="card-title" style="margin:0">Причина отмены</h3>
+      <button class="close-x" id="cancel-modal-close">✕</button>
+    </div>
+    <div style="padding:12px;display:grid;gap:10px">
+      <textarea id="cancel-reason" rows="4" placeholder="Укажите причину отмены..." required></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="ghost" id="cancel-modal-cancel">Отмена</button>
+        <button id="cancel-modal-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- === Добавление товара: кнопка + модалка === -->
+<style>
+  .adm-fab{position:fixed; right:20px; bottom:20px; z-index:9999;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 14px; border:0; border-radius:999px; cursor:pointer;
+    background:#10b981; color:#fff; font-weight:800; box-shadow:0 10px 24px rgba(0,0,0,.18); opacity:.95}
+  .adm-fab:hover{opacity:1}
+  .adm-modal-back{position:fixed; inset:0; background:rgba(2,6,23,.48); backdrop-filter: blur(2px);
+    display:none; align-items:center; justify-content:center; z-index:10000}
+  .adm-modal{width:min(920px,96vw); max-height:86vh; overflow:auto; background:#fff; color:#111827;
+    border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,.25); padding:18px}
+  .adm-modal h3{margin:0 0 12px}
+  .adm-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .adm-col{display:flex; flex-direction:column; gap:10px}
+  .adm-field label{font-size:12px; color:#475569; display:block; margin-bottom:4px}
+  .adm-field input[type="text"], .adm-field input[type="number"], .adm-field textarea{
+    width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; outline:none}
+  .adm-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
+  .adm-btn{padding:10px 14px; border-radius:10px; border:0; cursor:pointer; font-weight:700}
+  .adm-btn--ghost{background:#eef2ff; color:#111}
+  .adm-btn--accent{background:#111827; color:#fff}
+  @media (max-width:800px){ .adm-grid{grid-template-columns:1fr} }
+</style>
+
+<div class="adm-modal-back" id="admAddBack">
+  <div class="adm-modal">
+    <h3>Новый товар</h3>
+    <div class="adm-grid">
+      <div class="adm-col">
+        <div class="adm-field">
+          <label>Название*</label>
+          <input type="text" id="p_name" placeholder="Например: STILVA S-150">
+        </div>
+        <div class="adm-field">
+          <label>Цена, ₽*</label>
+          <input type="number" id="p_price" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="adm-field">
+          <label>Опубликован</label>
+          <input type="checkbox" id="p_published" checked>
+        </div>
+        <div class="adm-field">
+          <label>Ссылка на изображение</label>
+          <input type="text" id="p_image_url" placeholder="https://…/img.jpg">
+        </div>
+        <div class="adm-field">
+          <label>Описание</label>
+          <textarea id="p_description" rows="4" placeholder="Короткое описание"></textarea>
+        </div>
+      </div>
+      <div class="adm-col">
+        <div class="adm-field">
+          <label>Кол-во полок</label>
+          <input type="number" id="p_shelves" min="0" step="1" value="0">
+        </div>
+        <div class="adm-field">
+  <label>Материал</label>
+  <select id="p_material">
+    <option>AISI 430</option>
+    <option>AISI 304</option>
+    <option>AISI 304/430</option>
+  </select>
+</div>
+<div class="adm-field">
+  <label>Конструкция</label>
+  <select id="p_construction">
+    <option>Сборно-разборная</option>
+    <option>Сварная</option>
+  </select>
+</div>
+<div class="adm-field">
+  <label>Перфорация</label>
+  <select id="p_perforation">
+    <option>Да</option>
+    <option>Нет</option>
+  </select>
+</div>
+        <div class="adm-field">
+          <label>Толщина полки</label>
+          <input type="text" id="p_shelf_thickness" placeholder="0.8 мм">
+        </div>
+        <div class="adm-field">
+          <label>В наличии</label>
+          <input type="number" id="p_stock_qty" min="0" step="1" value="0">
+        </div>
+        <div class="adm-field">
+          <label>Срок поставки</label>
+          <input type="number" id="p_lead_time_days" min="0" step="1" value="0">
+        </div>
+      </div>
+    </div>
+    <div class="adm-actions">
+      <button class="adm-btn adm-btn--ghost" id="admAddCancel">Отмена</button>
+      <button class="adm-btn adm-btn--accent" id="admAddSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = sel => document.querySelector(sel);
+  const back = $('#admAddBack');
+  const open = () => back.style.display = 'flex';
+  const close = () => back.style.display = 'none';
+
+  ['#add-product-left', '#add-product-right'].forEach(sel=>{
+  const b = document.querySelector(sel);
+  if (b) b.addEventListener('click', open);
+});
+$('#admAddCancel').addEventListener('click', close);
+
+
+  function num(v, def=0){
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : def;
+  }
+  function int(v, def=0){
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : def;
+  }
+
+  $('#admAddSave').addEventListener('click', async function(){
+    const payload = {
+      name: ($('#p_name').value || '').trim(),
+      price: num($('#p_price').value, 0),
+      published: $('#p_published').checked ? 1 : 0,
+      image_url: ($('#p_image_url').value || '').trim(),
+      shelves: int($('#p_shelves').value, 0),
+      material: ($('#p_material').value || '').trim(),
+      construction: ($('#p_construction').value || '').trim(),
+      perforation: ($('#p_perforation').value || '').trim(),
+      shelf_thickness: ($('#p_shelf_thickness').value || '').trim(),
+      description: ($('#p_description').value || '').trim(),
+      stock_qty: int($('#p_stock_qty').value, 0),
+      lead_time_days: int($('#p_lead_time_days').value, 0),
+    };
+
+    if (!payload.name) { alert('Введите название'); return; }
+    if (payload.price <= 0) { if(!confirm('Цена 0 — сохранить?')) return; }
+
+    try{
+      const res = await fetch('/api/products', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok){
+        const t = await res.text();
+        throw new Error('Ошибка API: ' + t);
+      }
+      close();
+      // проще и надёжнее, чем лезть в чужой рендер: просто обновим страницу
+      location.reload();
+    }catch(err){
+      console.error(err);
+      alert('Не удалось сохранить товар. См. консоль.');
+    }
+  });
+})();
+</script>
+<!-- === /Добавление товара === -->
+
+
+<!-- === Редактирование товара (отдельная модалка + превью) === -->
+<style>
+  .adm-modal-back{position:fixed; inset:0; background:rgba(2,6,23,.48); backdrop-filter: blur(2px);
+    display:none; align-items:center; justify-content:center; z-index:10000}
+  .adm-modal{width:min(920px,96vw); max-height:86vh; overflow:auto; background:#fff; color:#111827;
+    border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 20px 50px rgba(0,0,0,.25); padding:18px}
+  .adm-modal h3{margin:0 0 12px}
+  .adm-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .adm-col{display:flex; flex-direction:column; gap:10px}
+  .adm-field label{font-size:12px; color:#475569; display:block; margin-bottom:4px}
+  .adm-field input[type="text"], .adm-field input[type="number"], .adm-field textarea, .adm-field select{
+    width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; outline:none; background:#fff}
+  .adm-row{display:flex; gap:14px; align-items:center}
+  .adm-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:12px}
+  .adm-btn{padding:10px 14px; border-radius:10px; border:0; cursor:pointer; font-weight:700}
+  .adm-btn--ghost{background:#eef2ff; color:#111}
+  .adm-btn--accent{background:#111827; color:#fff}
+  .adm-btn--danger{background:#ef4444; color:#fff}
+  .imgbox{display:flex; gap:12px; align-items:center}
+  .imgbox img{width:120px; height:90px; object-fit:cover; border-radius:10px; border:1px solid #e5e7eb; background:#f3f4f6}
+  @media (max-width:800px){ .adm-grid{grid-template-columns:1fr} .imgbox{flex-direction:column; align-items:flex-start} }
+</style>
+
+<div class="adm-modal-back" id="admEditBack">
+  <div class="adm-modal" role="dialog" aria-modal="true">
+    <h3 id="e_title">Карточка товара</h3>
+    <div class="adm-grid">
+      <div class="adm-col">
+        <div class="adm-field">
+          <label>Название*</label>
+          <input type="text" id="e_name" placeholder="Например: STILVA S-150">
+        </div>
+        <div class="adm-row">
+          <div class="adm-field" style="flex:1">
+            <label>Цена, ₽*</label>
+            <input type="number" id="e_price" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="adm-field" style="width:160px">
+            <label>Опубликован</label>
+            <input type="checkbox" id="e_published">
+          </div>
+        </div>
+        <div class="adm-field">
+          <label>Ссылка на изображение</label>
+          <div class="imgbox">
+            <input type="text" id="e_image_url" placeholder="https://…/img.jpg" style="flex:1">
+            <img id="e_preview" alt="prev">
+          </div>
+        </div>
+        <div class="adm-field">
+          <label>Описание</label>
+          <textarea id="e_description" rows="4" placeholder="Короткое описание"></textarea>
+        </div>
+      </div>
+
+      <div class="adm-col">
+        <div class="adm-row">
+          <div class="adm-field" style="flex:1">
+            <label>Кол-во полок</label>
+            <input type="number" id="e_shelves" min="0" step="1" value="0">
+          </div>
+          <div class="adm-field" style="flex:1">
+            <label>В наличии</label>
+            <input type="number" id="e_stock_qty" min="0" step="1" value="0">
+          </div>
+          <div class="adm-field" style="flex:1">
+            <label>Срок поставки, дней</label>
+            <input type="number" id="e_lead_time_days" min="0" step="1" value="0">
+          </div>
+        </div>
+        <div class="adm-row">
+          <div class="adm-field" style="flex:1">
+            <label>Материал</label>
+            <select id="e_material">
+              <option>AISI 430</option>
+              <option>AISI 304</option>
+              <option>AISI 304/430</option>
+            </select>
+          </div>
+          <div class="adm-field" style="flex:1">
+            <label>Конструкция</label>
+            <select id="e_construction">
+              <option>Сборно-разборная</option>
+              <option>Сварная</option>
+            </select>
+          </div>
+          <div class="adm-field" style="flex:1">
+            <label>Перфорация</label>
+            <select id="e_perforation">
+              <option>Да</option>
+              <option>Нет</option>
+            </select>
+          </div>
+        </div>
+        <div class="adm-field">
+          <label>Толщина полки</label>
+          <input type="text" id="e_shelf_thickness" placeholder="0.8 мм">
+        </div>
+      </div>
+    </div>
+
+    <div class="adm-actions">
+      <button class="adm-btn adm-btn--danger" id="e_delete" style="margin-right:auto">Удалить</button>
+      <button class="adm-btn adm-btn--ghost" id="e_cancel">Отмена</button>
+      <button class="adm-btn adm-btn--accent" id="e_save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const back = document.getElementById('admEditBack');
+  const prev = document.getElementById('e_preview');
+  const byId = s => document.getElementById(s);
+  let currentId = null;
+
+  function preview(){
+    const url = (byId('e_image_url').value||'').trim();
+    prev.src = url ? url : 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="100%" height="100%" fill="#f3f4f6"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="12" fill="#9ca3af">превью</text></svg>');
+  }
+  byId('e_image_url').addEventListener('input', preview);
+
+  function fill(p){
+    byId('e_name').value = p?.name || '';
+    byId('e_price').value = p?.price ?? '';
+    byId('e_published').checked = !!(p?.published);
+    byId('e_image_url').value = p?.image_url || '';
+    byId('e_description').value = p?.description || '';
+    byId('e_shelves').value = p?.shelves ?? 0;
+    byId('e_stock_qty').value = p?.stock_qty ?? 0;
+    byId('e_lead_time_days').value = p?.lead_time_days ?? 0;
+    byId('e_material').value = p?.material || 'AISI 430';
+    byId('e_construction').value = p?.construction || 'Сборно-разборная';
+    byId('e_perforation').value = p?.perforation || 'Да';
+    byId('e_shelf_thickness').value = p?.shelf_thickness || '';
+    preview();
+  }
+
+  function collect(){
+    return {
+      name: (byId('e_name').value||'').trim(),
+      price: parseFloat(byId('e_price').value||'0') || 0,
+      published: byId('e_published').checked ? 1 : 0,
+      image_url: (byId('e_image_url').value||'').trim(),
+      description: (byId('e_description').value||'').trim(),
+      shelves: parseInt(byId('e_shelves').value||'0',10) || 0,
+      stock_qty: parseInt(byId('e_stock_qty').value||'0',10) || 0,
+      lead_time_days: parseInt(byId('e_lead_time_days').value||'0',10) || 0,
+      material: byId('e_material').value,
+      construction: byId('e_construction').value,
+      perforation: byId('e_perforation').value,
+      shelf_thickness: (byId('e_shelf_thickness').value||'').trim(),
+    };
+  }
+
+  function openEdit(p){ currentId = p?.id || null; byId('e_title').textContent = 'Карточка товара' + (currentId? ' #' + currentId : ''); fill(p||{}); back.style.display='flex'; }
+  function closeEdit(){ back.style.display='none'; currentId=null; }
+
+  byId('e_cancel').addEventListener('click', closeEdit);
+  back.addEventListener('click', e=>{ if(e.target===back) closeEdit(); });
+
+  byId('e_save').addEventListener('click', async ()=>{
+    if(!currentId) return;
+    const payload = collect();
+    if(!payload.name){ alert('Введите название'); return; }
+    try{
+      const res = await fetch('/api/products/'+currentId,{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if(!res.ok) throw new Error(await res.text());
+      closeEdit(); location.reload();
+    }catch(e){ console.error(e); alert('Не удалось сохранить товар'); }
+  });
+
+  byId('e_delete').addEventListener('click', async ()=>{
+    if(!currentId) return;
+    if(!confirm('Удалить товар #'+currentId+'?')) return;
+    try{
+      const res = await fetch('/api/products/'+currentId,{ method:'DELETE' });
+      if(!res.ok) throw new Error(await res.text());
+      closeEdit(); location.reload();
+    }catch(e){ console.error(e); alert('Не удалось удалить товар'); }
+  });
+
+  // Делаем функцию видимой глобально
+  window.__openEditProduct = openEdit;
+})();
+</script>
+<!-- === /Редактирование товара === -->
+
+<script>
+(function(){
+  const SEP = '\t';
+  function esc(v){ return '"' + String(v ?? '').replace(/\r?\n|\r/g,' ').replace(/"/g,'""') + '"'; }
+  function linesToCSV(lines){
+    return lines.map(row => row.map(esc).join(SEP)).join('\r\n');
+  }
+  function toXLSBlob(csv){
+    const buf = new Uint16Array(csv.length + 1);
+    buf[0] = 0xFEFF; // BOM
+    for (let i=0;i<csv.length;i++) buf[i+1]=csv.charCodeAt(i);
+    return new Blob([buf], { type: 'application/vnd.ms-excel;charset=utf-16le' });
+  }
+  function download(blob, prefix){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.download = `${prefix}_${stamp}.xls`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+  function buildStatsCSV(s){
+    const lines=[];
+    lines.push(['Период', `${s.from || '—'} — ${s.to || '—'}`]);
+    lines.push(['Статус', s.st || 'все']);
+    lines.push(['Выручка, ₽', s.totalRevenue]);
+    lines.push(['Заказов', s.ordersCount]);
+    lines.push([]);
+    lines.push(['Топ клиентов','Сумма, ₽']);
+    (s.topCustomers || []).forEach(([name,sum])=> lines.push([name, sum]));
+    lines.push([]);
+    lines.push(['Товары (за период)','Кол-во, шт.']);
+    (s.allProducts || []).forEach(([name,qty])=> lines.push([name, qty]));
+    return linesToCSV(lines);
+  }
+
+  async function exportStats(side){ // side: 'right' | 'left'
+    const key = side === 'left' ? '__lastStatsLeft' : '__lastStatsRight';
+    const calc = side === 'left' ? loadStatsLeft : loadStats;
+    if(!window[key]){ await calc(); }
+    const s = window[key];
+    if(!s) return;
+    const csv = buildStatsCSV(s);
+    download(toXLSBlob(csv), `stats_${side}`);
+  }
+
+  const btnR = document.getElementById('export-stats');
+  if(btnR && !btnR.dataset.wired){
+    btnR.dataset.wired = '1';
+    btnR.addEventListener('click', ()=> exportStats('right'));
+  }
+  const btnL = document.getElementById('export-stats-left');
+  if(btnL && !btnL.dataset.wired){
+    btnL.dataset.wired = '1';
+    btnL.addEventListener('click', ()=> exportStats('left'));
+  }
+})();
+</script>
+
+</body>
+</html>
