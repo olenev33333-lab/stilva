@@ -38,7 +38,50 @@ function cf_find_order_income(PDO $pdo, int $orderId){
   return $stmt->fetch();
 }
 
+function cf_bootstrap(PDO $pdo){
+  $pdo->exec("CREATE TABLE IF NOT EXISTS cashflow_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    type ENUM('income','expense') NOT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    UNIQUE KEY uniq_name_type (name, type)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS cashflow_entries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    date DATE NOT NULL,
+    type ENUM('income','expense') NOT NULL,
+    amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    category VARCHAR(120) NOT NULL,
+    payment_method ENUM('cash','card','transfer','bank') NOT NULL DEFAULT 'bank',
+    comment TEXT,
+    order_id INT NULL,
+    source ENUM('manual','order') NOT NULL DEFAULT 'manual',
+    status ENUM('active','void') NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_date (date),
+    KEY idx_type (type),
+    KEY idx_status (status),
+    KEY idx_order (order_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $pdo->exec("INSERT IGNORE INTO cashflow_categories (name, type, active) VALUES
+    ('Продажа','income',1),
+    ('Доп. услуги','income',1),
+    ('Прочее','income',1),
+    ('Закупка','expense',1),
+    ('Доставка','expense',1),
+    ('Аренда','expense',1),
+    ('Зарплата','expense',1),
+    ('Реклама','expense',1),
+    ('Налоги','expense',1),
+    ('Хозяйственные','expense',1),
+    ('Прочее','expense',1)");
+}
+
 function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount){
+  cf_bootstrap($pdo);
   $row = cf_find_order_income($pdo, $orderId);
   $today = date('Y-m-d');
   if ($row){
@@ -59,6 +102,7 @@ function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount){
 }
 
 function cf_void_order_income(PDO $pdo, int $orderId){
+  cf_bootstrap($pdo);
   $row = cf_find_order_income($pdo, $orderId);
   if ($row){
     $stmt = $pdo->prepare("UPDATE cashflow_entries SET status = 'void', updated_at = NOW() WHERE id = :id");
@@ -282,6 +326,7 @@ try {
 
   if (($segments[0] ?? '') === 'cashflow'){
     $pdo = db();
+    cf_bootstrap($pdo);
     $sub = $segments[1] ?? '';
 
     if ($sub === 'categories'){

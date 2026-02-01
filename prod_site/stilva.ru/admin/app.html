@@ -733,6 +733,7 @@ async function loadOrdersInto(tbodySel, paneId, statusFilterId, sortState){
         await withOverlay(e.target, async ()=>{
           await api('/api/orders/'+id+'/status',{method:'PATCH', body: JSON.stringify({status:newStatus})});
           const idx=ordersCache.findIndex(x=>String(x.id)===String(id)); if(idx>-1) ordersCache[idx].status=newStatus; applyRowStatusClass(e.target.closest('tr'), newStatus);
+          ddsRefreshOpen();
         });
       });
     });
@@ -1479,6 +1480,7 @@ async function loadStatsLeft(){
           if(idx>-1){ ordersCache[idx].status='Отменен'; ordersCache[idx].cancel_reason = reason; ordersCache[idx].note = newNote; }
           setLocalCancel(String(orderId), reason, newNote);
           selectEl.dataset.prev = 'Отменен'; applyRowStatusClass(selectEl.closest('tr'), 'Отменен');
+          ddsRefreshOpen();
         });
       };
     }
@@ -1513,6 +1515,7 @@ async function loadStatsLeft(){
             if(idx>-1) ordersCache[idx].status = val;
             clearLocalCancel(String(orderId));
             sel.dataset.prev = val; applyRowStatusClass(sel.closest('tr'), val);
+            ddsRefreshOpen();
           });
         })();
         return;
