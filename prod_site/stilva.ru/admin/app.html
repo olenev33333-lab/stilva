@@ -321,6 +321,7 @@
           <option value="">Категория: все</option>
         </select>
         <button id="dds-apply-left" class="ghost">Показать</button>
+        <button id="dds-export-left" class="ghost">Выгрузить Excel</button>
         <button id="dds-add-left">+ Проводка</button>
         <button class="ghost" id="close-dds-left">Закрыть</button>
       </div>
@@ -332,12 +333,12 @@
         <table id="dds-left-table">
           <colgroup>
             <col style="width:90px"><col style="width:90px"><col style="width:110px"><col style="width:150px">
-            <col style="width:110px"><col style="width:110px"><col style="width:auto"><col style="width:80px"><col style="width:120px">
+            <col style="width:110px"><col style="width:110px"><col style="width:80px"><col style="width:160px">
           </colgroup>
           <thead>
           <tr>
             <th>Дата</th><th>Тип</th><th>Сумма</th><th>Категория</th>
-            <th>Оплата</th><th>Статус</th><th>Комментарий</th><th>Заказ</th><th></th>
+            <th>Оплата</th><th>Статус</th><th>Заказ</th><th></th>
           </tr>
           </thead>
           <tbody></tbody>
@@ -467,6 +468,7 @@
               <option value="">Категория: все</option>
             </select>
             <button id="dds-apply-right" class="ghost">Показать</button>
+            <button id="dds-export-right" class="ghost">Выгрузить Excel</button>
             <button id="dds-add-right">+ Проводка</button>
             <button class="ghost" id="close-dds-right">Закрыть</button>
           </div>
@@ -478,12 +480,12 @@
             <table id="dds-right-table">
               <colgroup>
                 <col style="width:90px"><col style="width:90px"><col style="width:110px"><col style="width:150px">
-                <col style="width:110px"><col style="width:110px"><col style="width:auto"><col style="width:80px"><col style="width:120px">
+                <col style="width:110px"><col style="width:110px"><col style="width:80px"><col style="width:160px">
               </colgroup>
               <thead>
               <tr>
                 <th>Дата</th><th>Тип</th><th>Сумма</th><th>Категория</th>
-                <th>Оплата</th><th>Статус</th><th>Комментарий</th><th>Заказ</th><th></th>
+                <th>Оплата</th><th>Статус</th><th>Заказ</th><th></th>
               </tr>
               </thead>
               <tbody></tbody>
@@ -589,6 +591,19 @@
         <button class="adm-btn adm-btn--ghost" id="dds-modal-cancel">Отмена</button>
         <button class="adm-btn adm-btn--accent" id="dds-modal-save">Сохранить</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: комментарий ДДС -->
+<div class="modal-backdrop" id="dds-comment-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dds-comment-title" style="width:min(760px,96vw)">
+    <div class="modal-head">
+      <h3 id="dds-comment-title" class="card-title" style="margin:0">Комментарий</h3>
+      <button class="close-x" id="dds-comment-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div id="dds-comment-body" style="white-space:pre-wrap;line-height:1.5"></div>
     </div>
   </div>
 </div>
@@ -898,6 +913,8 @@ const ddsFallback = {
   expense: ['Закупка','Доставка','Аренда','Зарплата','Реклама','Налоги','Хозяйственные','Прочее']
 };
 const ddsState = { categories: { income: [], expense: [] } };
+const ddsLast = { left: null, right: null };
+const ddsComments = new Map();
 
 function ddsToNum(v){
   if (v == null) return 0;
@@ -970,6 +987,7 @@ async function loadDds(side){
   await withOverlay(pane, async ()=>{
     const res = await api('/api/cashflow' + ddsBuildQuery({ from, to, type, status, payment, category }));
     const list = res.ok ? await res.json() : [];
+    ddsLast[side] = list;
 
     const income = list.filter(x=>x.status !== 'void' && x.type === 'income').reduce((s,x)=>s+ddsToNum(x.amount),0);
     const expense = list.filter(x=>x.status !== 'void' && x.type === 'expense').reduce((s,x)=>s+ddsToNum(x.amount),0);
@@ -988,6 +1006,9 @@ async function loadDds(side){
       const tr = document.createElement('tr');
       if (row.status === 'void') tr.classList.add('dds-void');
       const orderTxt = row.order_id ? ('#' + row.order_id) : '—';
+      const commentTxt = row.comment ? String(row.comment) : '';
+      const hasComment = commentTxt.trim() !== '';
+      if (row.id != null) ddsComments.set(String(row.id), commentTxt);
       tr.innerHTML =
         `<td class="cell-ellipsis">${row.date || '—'}</td>` +
         `<td class="cell-ellipsis">${ddsTypeLabels[row.type] || row.type}</td>` +
@@ -995,9 +1016,9 @@ async function loadDds(side){
         `<td class="cell-ellipsis">${row.category || '—'}</td>` +
         `<td class="cell-ellipsis">${ddsPaymentLabels[row.payment_method] || row.payment_method}</td>` +
         `<td class="cell-ellipsis">${ddsStatusLabels[row.status] || row.status}</td>` +
-        `<td class="cell-wrap">${row.comment ? String(row.comment) : '—'}</td>` +
         `<td class="cell-ellipsis">${orderTxt}</td>` +
         `<td class="actions"><div class="btns">` +
+          `<button class="ghost dds-comment" data-id="${row.id}" ${hasComment ? '' : 'disabled'}>Комментарий</button>` +
           (row.status === 'void'
             ? `<button class="ghost dds-restore" data-id="${row.id}">Вернуть</button>`
             : `<button class="ghost dds-void" data-id="${row.id}">Аннулировать</button>`) +
@@ -1006,7 +1027,7 @@ async function loadDds(side){
       tbody.appendChild(tr);
     });
     if (!list.length){
-      tbody.innerHTML = `<tr><td colspan="9"><span class="muted">Проводок нет</span></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><span class="muted">Проводок нет</span></td></tr>`;
     }
   });
 }
@@ -1048,6 +1069,19 @@ function ddsModalClose(){
   if (back) back.style.display = 'none';
 }
 
+function ddsCommentOpen(id){
+  const back = document.getElementById('dds-comment-backdrop');
+  const body = document.getElementById('dds-comment-body');
+  if (!back || !body) return;
+  const txt = ddsComments.get(String(id)) || '';
+  body.textContent = txt ? txt : '—';
+  back.style.display = 'flex';
+}
+function ddsCommentClose(){
+  const back = document.getElementById('dds-comment-backdrop');
+  if (back) back.style.display = 'none';
+}
+
 document.addEventListener('change', (e)=>{
   const t = e.target.closest('#dds_type');
   if (t){
@@ -1060,9 +1094,14 @@ document.addEventListener('change', (e)=>{
 });
 
 document.addEventListener('click', async (e)=>{
+  const c = e.target.closest('.dds-comment');
   const v = e.target.closest('.dds-void');
   const r = e.target.closest('.dds-restore');
   const d = e.target.closest('.dds-delete');
+  if (c){
+    const id = c.dataset.id;
+    if (!c.disabled) ddsCommentOpen(id);
+  }
   if (v){
     const id = v.dataset.id;
     await withOverlay(v, async ()=>{
@@ -1094,6 +1133,8 @@ document.addEventListener('click', (e)=>{
   if (openRight){ e.preventDefault(); ddsModalOpen('right'); }
   const close = e.target.closest('#dds-modal-close, #dds-modal-cancel');
   if (close){ e.preventDefault(); ddsModalClose(); }
+  const closeComment = e.target.closest('#dds-comment-close');
+  if (closeComment){ e.preventDefault(); ddsCommentClose(); }
 });
 
 document.getElementById('dds-modal-save')?.addEventListener('click', async ()=>{
@@ -1131,6 +1172,55 @@ document.getElementById('dds-modal-save')?.addEventListener('click', async ()=>{
 document.getElementById('dds-modal-backdrop')?.addEventListener('click', (e)=>{
   if (e.target && e.target.id === 'dds-modal-backdrop') ddsModalClose();
 });
+document.getElementById('dds-comment-backdrop')?.addEventListener('click', (e)=>{
+  if (e.target && e.target.id === 'dds-comment-backdrop') ddsCommentClose();
+});
+
+/* ===== DDS export ===== */
+function ddsEscapeCell(v){
+  const s = String(v ?? '').replace(/\r?\n|\r/g, ' ').replace(/"/g, '""').trim();
+  return '"' + s + '"';
+}
+function ddsLinesToCSV(lines){
+  return lines.map(row => row.map(ddsEscapeCell).join('\t')).join('\r\n');
+}
+function ddsToXLSBlob(csv){
+  const buf = new Uint16Array(csv.length + 1);
+  buf[0] = 0xFEFF;
+  for (let i=0;i<csv.length;i++) buf[i+1]=csv.charCodeAt(i);
+  return new Blob([buf], { type: 'application/vnd.ms-excel;charset=utf-16le' });
+}
+function ddsDownload(blob, prefix){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.download = `${prefix}_${stamp}.xls`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function ddsBuildExportLines(list){
+  const lines = [];
+  lines.push(['Дата','Тип','Сумма','Категория','Оплата','Статус','Комментарий','Заказ']);
+  (list || []).forEach(row=>{
+    lines.push([
+      row.date || '',
+      ddsTypeLabels[row.type] || row.type || '',
+      ddsToNum(row.amount || 0),
+      row.category || '',
+      ddsPaymentLabels[row.payment_method] || row.payment_method || '',
+      ddsStatusLabels[row.status] || row.status || '',
+      row.comment ? String(row.comment) : '',
+      row.order_id ? ('#'+row.order_id) : ''
+    ]);
+  });
+  return lines;
+}
+async function exportDds(side){
+  if (!ddsLast[side]) await loadDds(side);
+  const list = ddsLast[side] || [];
+  const csv = ddsLinesToCSV(ddsBuildExportLines(list));
+  ddsDownload(ddsToXLSBlob(csv), `dds_${side}`);
+}
 
 /* ===== СТАТИСТИКА ===== */
 function loadStats(){
@@ -1402,6 +1492,8 @@ async function loadStatsLeft(){
   document.getElementById('load-stats').addEventListener('click', async (ev)=>{ await withOverlay(ev.currentTarget, async ()=>{ await loadStats(); }); });
   document.getElementById('dds-apply-left').addEventListener('click', ()=>loadDds('left'));
   document.getElementById('dds-apply-right').addEventListener('click', ()=>loadDds('right'));
+  document.getElementById('dds-export-left').addEventListener('click', ()=>exportDds('left'));
+  document.getElementById('dds-export-right').addEventListener('click', ()=>exportDds('right'));
 
   document.getElementById('reload-orders-left').addEventListener('click', async (ev)=>{
     await withOverlay(ev.currentTarget, async ()=>{ ordersCache=[]; await loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); });
