@@ -627,6 +627,12 @@ function upd_bootstrap(PDO $pdo){
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
+function upd_delete_by_order(PDO $pdo, int $orderId): void {
+  upd_bootstrap($pdo);
+  $stmt = $pdo->prepare("DELETE FROM upd_docs WHERE order_id = :oid");
+  $stmt->execute([':oid'=>$orderId]);
+}
+
 function upd_next_seq(PDO $pdo, int $year): int {
   $stmt = $pdo->prepare("SELECT MAX(doc_seq) AS m FROM upd_docs WHERE doc_year = :y");
   $stmt->execute([':y'=>$year]);
@@ -1451,7 +1457,7 @@ try {
 
       if ($method === 'PATCH'){
         $b = read_json();
-        $stmt = $pdo->prepare("SELECT id, total, status, payment_amount, payment_method FROM orders WHERE id = :id");
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :id");
         $stmt->execute([':id'=>$id]);
         $prev = $stmt->fetch();
         if (!$prev) out(404, ['error'=>'nf']);
@@ -1467,8 +1473,23 @@ try {
           'upd_signer1_fio','upd_signer1_pos','upd_signer1_type','upd_signer1_authority','upd_signer1_date',
           'upd_signer2_fio','upd_signer2_pos','upd_signer2_type','upd_signer2_authority','upd_signer2_date'
         ];
+        $updInvalidateFields = [
+          'customer_name','phone','email','delivery_address',
+          'upd_buyer_type','upd_buyer_name','upd_buyer_inn','upd_buyer_kpp','upd_buyer_address','upd_buyer_other',
+          'upd_shipper_same','upd_shipper_name','upd_shipper_inn','upd_shipper_kpp','upd_shipper_address',
+          'upd_consignee_same','upd_consignee_name','upd_consignee_address',
+          'upd_doc_date','upd_vat_rate','upd_vat_included',
+          'upd_signer1_fio','upd_signer1_pos','upd_signer1_type','upd_signer1_authority','upd_signer1_date',
+          'upd_signer2_fio','upd_signer2_pos','upd_signer2_type','upd_signer2_authority','upd_signer2_date'
+        ];
+        $updDirty = false;
         $set = [];
         $args = [':id'=>$id];
+        $norm = function($v){
+          if ($v === null) return '';
+          if (is_bool($v)) return $v ? '1' : '0';
+          return trim((string)$v);
+        };
         foreach($fields as $f){
           if (array_key_exists($f, $b)){
             $set[] = "$f = :$f";
@@ -1497,6 +1518,11 @@ try {
             } else {
               $args[":$f"] = (string)$b[$f];
             }
+            if (!$updDirty && in_array($f, $updInvalidateFields, true)){
+              $oldVal = $prev[$f] ?? null;
+              $newVal = $args[":$f"];
+              if ($norm($newVal) !== $norm($oldVal)) $updDirty = true;
+            }
           }
         }
         if (!$set) out(400, ['error'=>'no_fields']);
@@ -1510,6 +1536,9 @@ try {
         $sql = "UPDATE orders SET ".implode(',', $set)." WHERE id = :id";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($args);
+        if ($updDirty){
+          try { upd_delete_by_order($pdo, $id); } catch (Throwable $e) {}
+        }
         cf_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         stock_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         out(200, ['ok'=>true]);
@@ -1561,6 +1590,9 @@ try {
         if (!is_string($k) || $k === '') continue;
         settings_set($pdo, $k, $v);
       }
+      if (array_key_exists('seller', $b)){
+        try { $pdo->exec("DELETE FROM upd_docs"); } catch (Throwable $e) {}
+      }
       out(200, ['ok'=>true]);
     }
     out(404, ['error'=>'nf']);
@@ -1569,6 +1601,21 @@ try {
   if (($segments[0] ?? '') === 'upd'){
     $pdo = db();
     upd_bootstrap($pdo);
+
+    if ($method === 'GET' && count($segments) === 1 && isset($_GET['order_id'])){
+      $oid = (int)$_GET['order_id'];
+      if ($oid <= 0) out(400, ['error'=>'order_required']);
+      $stmt = $pdo->prepare("SELECT * FROM upd_docs WHERE order_id = :oid");
+      $stmt->execute([':oid'=>$oid]);
+      $row = $stmt->fetch();
+      if (!$row) out(404, ['error'=>'nf']);
+      $doc = json_decode((string)$row['data_json'], true);
+      if (!is_array($doc)) $doc = [];
+      $doc['id'] = (int)$row['id'];
+      $doc['doc_number'] = $row['doc_number'];
+      $doc['doc_date'] = $row['doc_date'];
+      out(200, $doc);
+    }
 
     if ($method === 'POST' && count($segments) === 1){
       $b = read_json();

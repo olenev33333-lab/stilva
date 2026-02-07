@@ -180,6 +180,9 @@
 #orders-left-table tbody tr.status-new,
 #orders-right-table tbody tr.status-new { background:#f0fdf4; }         /* very pale green */
 
+#orders-left-table tbody tr.status-delivery,
+#orders-right-table tbody tr.status-delivery { background:#fefce8; }    /* pale yellow */
+
 #orders-left-table tbody tr.status-critical,
 #orders-right-table tbody tr.status-critical,
 #orders-left-table tbody tr.status-cancelled,
@@ -306,7 +309,7 @@
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="from-left" type="date"><input id="to-left" type="date">
         <select id="stat-status-left" title="Статус">
-          <option value="">Статусы: все</option><option value="Выполнен">Только выполненные</option><option value="Новый">Только новые</option><option value="В работе">Только в работе</option><option value="Критическое ожидание">Только критическое ожидание</option><option value="Отменен">Только отмененные</option>
+          <option value="">Статусы: все</option><option value="Выполнен">Только выполненные</option><option value="Новый">Только новые</option><option value="В работе">Только в работе</option><option value="Передан в доставку">Передан в доставку</option><option value="Критическое ожидание">Только критическое ожидание</option><option value="Отменен">Только отмененные</option>
         </select>
         <button id="load-stats-left" class="ghost">Показать</button>
         <button id="export-stats" class="ghost">Скачать Excel</button>
@@ -326,7 +329,7 @@
     <div class="card-head" style="margin-top:-8px">
       <h3 class="card-title">Заказы</h3>
       <select id="status-filter-left" title="Фильтр по статусу">
-        <option value="">Все</option><option>Новый</option><option>В работе</option><option>Критическое ожидание</option><option>Выполнен</option><option>Отменен</option>
+        <option value="">Все</option><option>Новый</option><option>В работе</option><option>Передан в доставку</option><option>Критическое ожидание</option><option>Выполнен</option><option>Отменен</option>
       </select>
       <button id="reload-orders-left" class="ghost">Обновить</button>
       <button id="export-orders-left" class="ghost">Скачать Excel</button>
@@ -486,7 +489,7 @@
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input id="from" type="date"><input id="to" type="date">
             <select id="stat-status" title="Статус">
-              <option value="">Статусы: все</option><option value="Выполнен">Только выполненные</option><option value="Новый">Только новые</option><option value="В работе">Только в работе</option><option value="Критическое ожидание">Только критическое ожидание</option><option value="Отменен">Только отмененные</option>
+        <option value="">Статусы: все</option><option value="Выполнен">Только выполненные</option><option value="Новый">Только новые</option><option value="В работе">Только в работе</option><option value="Передан в доставку">Передан в доставку</option><option value="Критическое ожидание">Только критическое ожидание</option><option value="Отменен">Только отмененные</option>
             </select>
             <button id="load-stats" class="ghost">Показать</button>
             <button id="export-stats" class="ghost">Скачать Excel</button>
@@ -506,7 +509,7 @@
         <div class="card-head" style="margin-top:-8px">
           <h3 class="card-title">Заказы</h3>
           <select id="status-filter-right" title="Фильтр по статусу">
-            <option value="">Все</option><option>Новый</option><option>В работе</option><option>Критическое ожидание</option><option>Выполнен</option><option>Отменен</option>
+            <option value="">Все</option><option>Новый</option><option>В работе</option><option>Передан в доставку</option><option>Критическое ожидание</option><option>Выполнен</option><option>Отменен</option>
           </select>
           <button id="reload-orders-right" class="ghost">Обновить</button>
           <button id="export-orders-right" class="ghost">Скачать Excel</button>
@@ -1135,7 +1138,7 @@ function renderOrderRow(o){
     '<td class="cell-wrap">'+(o.created_at ? new Date(o.created_at).toLocaleString() : '—')+'</td>'+
     '<td class="cell-wrap">'+[(o.customer_name||''),(o.phone||''),(o.email||'')].filter(Boolean).join(' / ')+'</td>'+
     '<td class="cell-wrap">'+(o.total||0)+'</td>'+
-    '<td><select data-id="'+o.id+'" class="status-select">' + ['Новый','В работе','Критическое ожидание','Выполнен','Отменен'].map(s=>'<option '+(s===(o.status||'')?'selected':'')+'>'+s+'</option>').join('') + '</select></td>'+
+    '<td><select data-id="'+o.id+'" class="status-select">' + ['Новый','В работе','Передан в доставку','Критическое ожидание','Выполнен','Отменен'].map(s=>'<option '+(s===(o.status||'')?'selected':'')+'>'+s+'</option>').join('') + '</select></td>'+
     '<td class="actions"><div class="btns"><button class="ghost open-order" data-id="'+o.id+'">Открыть заказ</button><button class="danger del-order" data-id="'+o.id+'">Удалить</button></div></td>';
   return tr;
 }
@@ -1144,13 +1147,14 @@ function renderOrderRow(o){
 function statusClass(s){
   if(s==='Новый') return 'status-new';
   if(s==='В работе') return 'status-inprogress';
+  if(s==='Передан в доставку') return 'status-delivery';
   if(s==='Критическое ожидание') return 'status-critical';
   if(s==='Отменен') return 'status-cancelled';
   return '';
 }
 function applyRowStatusClass(tr, status){
   if(!tr) return;
-  tr.classList.remove('status-new','status-inprogress','status-critical','status-cancelled');
+  tr.classList.remove('status-new','status-inprogress','status-delivery','status-critical','status-cancelled');
   const c = statusClass(status||'');
   if(c) tr.classList.add(c);
 }
@@ -1530,6 +1534,12 @@ function openOrderModal(order){
           </div>
         </div>
       </div>
+      <div class="adm-actions" style="justify-content:flex-start;gap:8px;flex-wrap:wrap">
+        <button class="adm-btn adm-btn--accent" id="o_upd_create">Создать УПД</button>
+        <button class="adm-btn adm-btn--ghost" id="o_upd_xml" disabled>Скачать XML</button>
+        <button class="adm-btn adm-btn--ghost" id="o_upd_print" disabled>Печать</button>
+        <span id="o_upd_status" class="muted"></span>
+      </div>
     </div>
     <div class="order-section">
       <div class="list-title">Чек-лист</div>
@@ -1617,6 +1627,50 @@ function openOrderModal(order){
   buyerAddrEl?.addEventListener('input', ()=>{ if (consigneeSameEl?.checked) fillConsigneeFromBuyer(true); });
   toggleShipper();
   toggleConsignee();
+
+  const updCreateBtn = document.getElementById('o_upd_create');
+  const updXmlBtn = document.getElementById('o_upd_xml');
+  const updPrintBtn = document.getElementById('o_upd_print');
+  const updStatusEl = document.getElementById('o_upd_status');
+
+  async function refreshOrderUpd(orderId){
+    const meta = await updFetchByOrder(orderId);
+    if (meta && meta.id){
+      orderModalContent.dataset.updId = String(meta.id);
+      updXmlBtn.disabled = false;
+      updPrintBtn.disabled = false;
+      if (updStatusEl) updStatusEl.textContent = `УПД создан: ${meta.doc_number || meta.id}`;
+    } else {
+      orderModalContent.dataset.updId = '';
+      updXmlBtn.disabled = true;
+      updPrintBtn.disabled = true;
+      if (updStatusEl) updStatusEl.textContent = 'УПД не создан';
+    }
+  }
+
+  updCreateBtn?.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    const doc = await updCreateForOrder(order.id);
+    if (!doc) return;
+    orderModalContent.dataset.updId = String(doc.id);
+    updXmlBtn.disabled = false;
+    updPrintBtn.disabled = false;
+    if (updStatusEl) updStatusEl.textContent = `УПД создан: ${doc.doc_number || doc.id}`;
+  });
+  updXmlBtn?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    const id = orderModalContent.dataset.updId;
+    if (!id) return;
+    window.location.href = `/api/upd/${id}/xml`;
+  });
+  updPrintBtn?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    const id = orderModalContent.dataset.updId;
+    if (!id) return;
+    window.open(`/api/upd/${id}/print`, '_blank');
+  });
+  refreshOrderUpd(order.id);
+
   document.getElementById('order-save')?.addEventListener('click', orderModalSave);
   orderModalBackdrop.style.display='flex';
 }
@@ -1671,6 +1725,23 @@ async function orderModalSave(){
     if (!res.ok) throw new Error(await res.text());
     const idx = ordersCache.findIndex(x=>String(x.id)===String(id));
     if (idx > -1) Object.assign(ordersCache[idx], payload);
+    if (document.getElementById('o_upd_xml')){
+      const meta = await updFetchByOrder(id);
+      const updXmlBtn = document.getElementById('o_upd_xml');
+      const updPrintBtn = document.getElementById('o_upd_print');
+      const updStatusEl = document.getElementById('o_upd_status');
+      if (meta && meta.id){
+        orderModalContent.dataset.updId = String(meta.id);
+        if (updXmlBtn) updXmlBtn.disabled = false;
+        if (updPrintBtn) updPrintBtn.disabled = false;
+        if (updStatusEl) updStatusEl.textContent = `УПД создан: ${meta.doc_number || meta.id}`;
+      } else {
+        orderModalContent.dataset.updId = '';
+        if (updXmlBtn) updXmlBtn.disabled = true;
+        if (updPrintBtn) updPrintBtn.disabled = true;
+        if (updStatusEl) updStatusEl.textContent = 'УПД не создан';
+      }
+    }
   }catch(err){
     console.error(err);
     alert('Не удалось сохранить заказ');
@@ -2912,6 +2983,34 @@ async function loadStatsLeft(){
   let updCurrentOrder = null;
   let updDocId = null;
 
+  async function updFetchByOrder(orderId){
+    const res = await api(`/api/upd?order_id=${orderId}`);
+    if (!res.ok) return null;
+    return await res.json();
+  }
+
+  async function updCreateForOrder(orderId){
+    const res = await api('/api/upd', { method:'POST', body: JSON.stringify({ order_id: orderId }) });
+    if (!res.ok){
+      const err = await res.json().catch(()=>({}));
+      if (err && err.error === 'validation'){
+        const map = {
+          seller_name:'Продавец: наименование', seller_inn:'Продавец: ИНН', seller_fio:'Продавец: ФИО', seller_address:'Продавец: адрес',
+          buyer_name:'Покупатель: наименование', buyer_inn:'Покупатель: ИНН', buyer_address:'Покупатель: адрес', buyer_other:'Покупатель: иные сведения (для физлица)',
+          consignee_address:'Грузополучатель: адрес'
+        };
+        const fields = (err.fields || []).map(f=>map[f] || f).join(', ');
+        alert('Заполните обязательные поля: ' + fields);
+      } else if (err && err.error === 'no_signers'){
+        alert('Добавьте подписантов для УПД в карточке заказа.');
+      } else {
+        alert('Не удалось сформировать УПД');
+      }
+      return null;
+    }
+    return await res.json();
+  }
+
   function updOpen(){
     updBackdrop.style.display='flex';
     updCurrentOrder = null; updDocId = null;
@@ -2938,6 +3037,17 @@ async function loadStatsLeft(){
     if (!res.ok){ alert('Заказ не найден'); return; }
     updCurrentOrder = await res.json();
     updSummary(updCurrentOrder);
+    const meta = await updFetchByOrder(id);
+    if (meta && meta.id){
+      updDocId = meta.id;
+      updDownloadBtn.disabled = false;
+      updPrintBtn.disabled = false;
+      document.getElementById('upd-order-summary').textContent = `УПД создан: ${meta.doc_number || meta.id}`;
+    } else {
+      updDocId = null;
+      updDownloadBtn.disabled = true;
+      updPrintBtn.disabled = true;
+    }
   }
   function updAskConfirm(){
     if (!updCurrentOrder){ alert('Сначала загрузите заказ'); return; }
@@ -2945,25 +3055,8 @@ async function loadStatsLeft(){
   }
   async function updCreateConfirmed(){
     if (!updCurrentOrder) return;
-    const res = await api('/api/upd', { method:'POST', body: JSON.stringify({ order_id: updCurrentOrder.id }) });
-    if (!res.ok){
-      const err = await res.json().catch(()=>({}));
-      if (err && err.error === 'validation'){
-        const map = {
-          seller_name:'Продавец: наименование', seller_inn:'Продавец: ИНН', seller_fio:'Продавец: ФИО', seller_address:'Продавец: адрес',
-          buyer_name:'Покупатель: наименование', buyer_inn:'Покупатель: ИНН', buyer_address:'Покупатель: адрес', buyer_other:'Покупатель: иные сведения (для физлица)',
-          consignee_address:'Грузополучатель: адрес'
-        };
-        const fields = (err.fields || []).map(f=>map[f] || f).join(', ');
-        alert('Заполните обязательные поля: ' + fields);
-      } else if (err && err.error === 'no_signers'){
-        alert('Добавьте подписантов для УПД в карточке заказа.');
-      } else {
-        alert('Не удалось сформировать УПД');
-      }
-      return;
-    }
-    const doc = await res.json();
+    const doc = await updCreateForOrder(updCurrentOrder.id);
+    if (!doc) return;
     updDocId = doc.id;
     updDownloadBtn.disabled = false;
     updPrintBtn.disabled = false;
