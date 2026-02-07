@@ -219,6 +219,23 @@
   overflow:visible;
   text-overflow:clip;
 }
+/* ===== Order modal extras ===== */
+.order-section{margin-top:14px}
+.order-section .list-title{margin:0 0 6px 0;font-weight:800;color:#0f172a;font-size:14px}
+.order-checklist{display:grid;gap:8px}
+.order-checklist label{display:flex;gap:8px;align-items:center}
+.order-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.order-badge.ok{background:#ecfdf5;color:#065f46;border:1px solid #bbf7d0}
+.order-badge.warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.order-availability{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;font-size:13px}
+.order-availability .head{font-weight:700;color:#334155}
+@media (max-width:800px){
+  .order-availability{grid-template-columns:1fr auto}
+  .order-availability .head:nth-child(3),
+  .order-availability .head:nth-child(4){display:none}
+  .order-availability div:nth-child(3n){display:none}
+  .order-availability div:nth-child(4n){display:none}
+}
 @media (max-width: 900px){
   .stock-row{grid-template-columns:1fr 90px 90px 36px}
 }
@@ -1080,21 +1097,175 @@ function openOrderModal(order){
     const sum=qty*price;
     return `<div>${name}</div><div>${qty}</div><div>${price}</div><div>${sum}</div>`;
   }).join('');
+  const availabilityRows = items.map(it=>{
+    const name=it&&it.name?String(it.name):'Товар';
+    const qty=Number(it&&it.qty)||1;
+    const availRaw = (it && it.available_qty != null) ? Number(it.available_qty) : null;
+    const avail = Number.isFinite(availRaw) ? Math.max(0, availRaw) : null;
+    const shortage = (it && it.shortage_qty != null) ? Number(it.shortage_qty) : null;
+    let statusHtml = '<span class="order-badge warn">—</span>';
+    if (avail != null){
+      statusHtml = (shortage && shortage > 0)
+        ? `<span class="order-badge warn">Не хватает: ${shortage}</span>`
+        : `<span class="order-badge ok">Хватает</span>`;
+    }
+    return `<div>${name}</div><div>${qty}</div><div>${avail != null ? avail : '—'}</div><div>${statusHtml}</div>`;
+  }).join('');
   const _noteRaw=(order.note||'').trim();
   const _reason=(order.cancel_reason||'').trim() || extractCancelReasonFromNote(_noteRaw);
   const reasonHtml = _reason ? `<div class="cancel-note">Отменен по причине: ${_reason}</div>` : '';
   const otherNote = removeCancelStampFromNote(_noteRaw).trim();
   const noteHtml = (otherNote ? `<div class="muted" style="margin-top:10px">Примечание: ${otherNote}</div>` : '') + reasonHtml;
   const total = Number(order.total)||0;
+  const payStatus = (order.payment_status || 'unpaid');
+  const payAmount = (order.payment_amount != null) ? Number(order.payment_amount) : 0;
+  const payMethod = order.payment_method || 'bank';
+  const payDate = order.payment_date || '';
+  const deliveryType = order.delivery_type || 'pickup';
+  const deliveryAddress = order.delivery_address || '';
+  const checklist = {
+    contacted: !!order.checklist_contacted,
+    confirmed: !!order.checklist_confirmed,
+    picked: !!order.checklist_picked,
+    shipped: !!order.checklist_shipped,
+    docs: !!order.checklist_docs
+  };
   orderModalContent.innerHTML = `
+    <div class="order-section">
+      <div class="list-title">Данные клиента</div>
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field"><label>Имя</label><input type="text" id="o_customer_name" value="${(order.customer_name||'').replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>Телефон</label><input type="text" id="o_phone" value="${(order.phone||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field"><label>Email</label><input type="text" id="o_email" value="${(order.email||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+      </div>
+    </div>
     <div class="mini-table">
       <div class="head">Наименование</div><div class="head">Кол-во</div><div class="head">Цена</div><div class="head">Сумма</div>
       ${rows || '<div>—</div><div></div><div></div><div></div>'}
     </div>
     <div style="margin-top:12px"><strong>Итого по заказу:</strong> ${total} ₽</div>
     ${noteHtml}
+    <div class="order-section">
+      <div class="list-title">Наличие по позициям</div>
+      <div class="order-availability">
+        <div class="head">Товар</div><div class="head">Нужно</div><div class="head">Доступно</div><div class="head">Статус</div>
+        ${availabilityRows || '<div>—</div><div></div><div></div><div></div>'}
+      </div>
+    </div>
+    <div class="order-section">
+      <div class="list-title">Доставка</div>
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Способ</label>
+            <select id="o_delivery_type">
+              <option value="pickup" ${deliveryType==='pickup'?'selected':''}>Самовывоз</option>
+              <option value="delivery" ${deliveryType==='delivery'?'selected':''}>Доставка</option>
+            </select>
+          </div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Адрес доставки</label>
+            <input type="text" id="o_delivery_address" value="${String(deliveryAddress||'').replace(/"/g,'&quot;')}">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="order-section">
+      <div class="list-title">Оплата</div>
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Статус оплаты</label>
+            <select id="o_payment_status">
+              <option value="unpaid" ${payStatus==='unpaid'?'selected':''}>Не оплачено</option>
+              <option value="partial" ${payStatus==='partial'?'selected':''}>Частично</option>
+              <option value="paid" ${payStatus==='paid'?'selected':''}>Оплачено</option>
+            </select>
+          </div>
+          <div class="adm-field">
+            <label>Сумма оплаты, ₽</label>
+            <input type="number" id="o_payment_amount" min="0" step="0.01" value="${Number.isFinite(payAmount)?payAmount:''}">
+          </div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Дата оплаты</label>
+            <input type="date" id="o_payment_date" value="${payDate}">
+          </div>
+          <div class="adm-field">
+            <label>Способ оплаты</label>
+            <select id="o_payment_method">
+              <option value="bank" ${payMethod==='bank'?'selected':''}>Безнал</option>
+              <option value="transfer" ${payMethod==='transfer'?'selected':''}>Перевод</option>
+              <option value="card" ${payMethod==='card'?'selected':''}>Карта</option>
+              <option value="cash" ${payMethod==='cash'?'selected':''}>Наличные</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="order-section">
+      <div class="list-title">Чек-лист</div>
+      <div class="order-checklist">
+        <label><input type="checkbox" id="o_check_contacted" ${checklist.contacted?'checked':''}> Связались с клиентом</label>
+        <label><input type="checkbox" id="o_check_confirmed" ${checklist.confirmed?'checked':''}> Подтверждение заказа</label>
+        <label><input type="checkbox" id="o_check_picked" ${checklist.picked?'checked':''}> Комплектация выполнена</label>
+        <label><input type="checkbox" id="o_check_shipped" ${checklist.shipped?'checked':''}> Отгрузка / самовывоз завершены</label>
+        <label><input type="checkbox" id="o_check_docs" ${checklist.docs?'checked':''}> Документы (УПД) подготовлены</label>
+      </div>
+    </div>
+    <div class="adm-actions">
+      <button class="adm-btn adm-btn--accent" id="order-save">Сохранить</button>
+    </div>
   `;
+  orderModalContent.dataset.id = String(order.id || '');
+  const deliveryEl = document.getElementById('o_delivery_type');
+  const addrEl = document.getElementById('o_delivery_address');
+  function toggleAddress(){
+    if (!deliveryEl || !addrEl) return;
+    const isDelivery = deliveryEl.value === 'delivery';
+    addrEl.disabled = !isDelivery;
+    addrEl.style.opacity = isDelivery ? '1' : '.6';
+  }
+  if (deliveryEl) deliveryEl.addEventListener('change', toggleAddress);
+  toggleAddress();
+  document.getElementById('order-save')?.addEventListener('click', orderModalSave);
   orderModalBackdrop.style.display='flex';
+}
+async function orderModalSave(){
+  const id = orderModalContent.dataset.id;
+  if (!id) return;
+  const payload = {
+    customer_name: (document.getElementById('o_customer_name')?.value || '').trim(),
+    phone: (document.getElementById('o_phone')?.value || '').trim(),
+    email: (document.getElementById('o_email')?.value || '').trim(),
+    delivery_type: document.getElementById('o_delivery_type')?.value || 'pickup',
+    delivery_address: (document.getElementById('o_delivery_address')?.value || '').trim(),
+    payment_status: document.getElementById('o_payment_status')?.value || 'unpaid',
+    payment_amount: parseFloat(document.getElementById('o_payment_amount')?.value || '0') || 0,
+    payment_date: document.getElementById('o_payment_date')?.value || '',
+    payment_method: document.getElementById('o_payment_method')?.value || 'bank',
+    checklist_contacted: document.getElementById('o_check_contacted')?.checked ? 1 : 0,
+    checklist_confirmed: document.getElementById('o_check_confirmed')?.checked ? 1 : 0,
+    checklist_picked: document.getElementById('o_check_picked')?.checked ? 1 : 0,
+    checklist_shipped: document.getElementById('o_check_shipped')?.checked ? 1 : 0,
+    checklist_docs: document.getElementById('o_check_docs')?.checked ? 1 : 0
+  };
+  try{
+    const res = await api('/api/orders/'+id, { method:'PATCH', body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(await res.text());
+    const idx = ordersCache.findIndex(x=>String(x.id)===String(id));
+    if (idx > -1) Object.assign(ordersCache[idx], payload);
+  }catch(err){
+    console.error(err);
+    alert('Не удалось сохранить заказ');
+  }
 }
 function closeOrderModal(){ orderModalBackdrop.style.display='none'; orderModalContent.innerHTML=''; }
 orderModalClose.addEventListener('click', closeOrderModal);

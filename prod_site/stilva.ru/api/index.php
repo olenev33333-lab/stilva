@@ -80,13 +80,14 @@ function cf_bootstrap(PDO $pdo){
     ('Прочее','expense',1)");
 }
 
-function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount){
+function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount, string $paymentMethod, string $date){
   cf_bootstrap($pdo);
   $row = cf_find_order_income($pdo, $orderId);
-  $today = date('Y-m-d');
+  $today = $date ?: date('Y-m-d');
+  if (!in_array($paymentMethod, ['cash','card','transfer','bank'], true)) $paymentMethod = 'bank';
   if ($row){
-    $stmt = $pdo->prepare("UPDATE cashflow_entries SET amount = :amt, status = 'active', date = :d, updated_at = NOW() WHERE id = :id");
-    $stmt->execute([':amt'=>$amount, ':d'=>$today, ':id'=>$row['id']]);
+    $stmt = $pdo->prepare("UPDATE cashflow_entries SET amount = :amt, status = 'active', date = :d, payment_method = :pm, updated_at = NOW() WHERE id = :id");
+    $stmt->execute([':amt'=>$amount, ':d'=>$today, ':pm'=>$paymentMethod, ':id'=>$row['id']]);
   } else {
     $stmt = $pdo->prepare("INSERT INTO cashflow_entries (date, type, amount, category, payment_method, comment, order_id, source, status)
       VALUES (:d, 'income', :amt, :cat, :pm, :cmt, :oid, 'order', 'active')");
@@ -94,7 +95,7 @@ function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount){
       ':d'   => $today,
       ':amt' => $amount,
       ':cat' => 'Продажа',
-      ':pm'  => 'bank',
+      ':pm'  => $paymentMethod,
       ':cmt' => 'Заказ #'.$orderId,
       ':oid' => $orderId,
     ]);
@@ -110,10 +111,17 @@ function cf_void_order_income(PDO $pdo, int $orderId){
   }
 }
 
-function cf_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newStatus, float $total){
+function cf_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newStatus){
   try {
     if ($newStatus === 'Выполнен'){
-      cf_upsert_order_income($pdo, $orderId, $total);
+      $stmt = $pdo->prepare("SELECT total, payment_amount, payment_method, payment_date FROM orders WHERE id = :id");
+      $stmt->execute([':id'=>$orderId]);
+      $row = $stmt->fetch();
+      $amount = (float)($row['payment_amount'] ?? 0);
+      if ($amount <= 0) $amount = (float)($row['total'] ?? 0);
+      $pm = (string)($row['payment_method'] ?? 'bank');
+      $date = (string)($row['payment_date'] ?? '');
+      cf_upsert_order_income($pdo, $orderId, $amount, $pm, $date ?: date('Y-m-d'));
     } elseif ($prevStatus === 'Выполнен' && $newStatus !== 'Выполнен') {
       cf_void_order_income($pdo, $orderId);
     }
@@ -495,6 +503,76 @@ function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $ne
   }
 }
 
+function order_bootstrap(PDO $pdo){
+  $cols = [
+    'delivery_type' => "ENUM('pickup','delivery') NOT NULL DEFAULT 'pickup'",
+    'delivery_address' => "VARCHAR(255) NULL",
+    'payment_status' => "ENUM('unpaid','partial','paid') NOT NULL DEFAULT 'unpaid'",
+    'payment_method' => "ENUM('cash','card','transfer','bank') NOT NULL DEFAULT 'bank'",
+    'payment_amount' => "DECIMAL(10,2) NOT NULL DEFAULT 0",
+    'payment_date' => "DATE NULL",
+    'checklist_contacted' => "TINYINT(1) NOT NULL DEFAULT 0",
+    'checklist_confirmed' => "TINYINT(1) NOT NULL DEFAULT 0",
+    'checklist_picked' => "TINYINT(1) NOT NULL DEFAULT 0",
+    'checklist_shipped' => "TINYINT(1) NOT NULL DEFAULT 0",
+    'checklist_docs' => "TINYINT(1) NOT NULL DEFAULT 0",
+  ];
+  foreach ($cols as $name=>$def){
+    try{
+      if (stock_column_missing($pdo, 'orders', $name)){
+        $pdo->exec("ALTER TABLE orders ADD COLUMN $name $def");
+      }
+    } catch (Throwable $e) {
+      // ignore if no permission
+    }
+  }
+}
+
+function order_items_with_availability(PDO $pdo, int $orderId): array {
+  stock_bootstrap($pdo);
+  $it = $pdo->prepare("SELECT id, product_id, name, price, qty FROM order_items WHERE order_id = :id ORDER BY id ASC");
+  $it->execute([':id'=>$orderId]);
+  $items = $it->fetchAll();
+  if (!$items) return [];
+
+  $productIds = array_values(array_unique(array_filter(array_map(fn($x)=>(int)$x['product_id'], $items))));
+  $productIds = array_filter($productIds, fn($x)=>$x>0);
+  $stockMap = [];
+  if ($productIds){
+    $in = implode(',', array_map('intval', $productIds));
+    $rows = $pdo->query("SELECT id, stock_qty FROM products WHERE id IN ($in)")->fetchAll();
+    foreach ($rows as $r){ $stockMap[(int)$r['id']] = (int)$r['stock_qty']; }
+  }
+  $reservedTotal = $productIds ? stock_reserved_map($pdo, $productIds) : [];
+  $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
+
+  foreach ($items as &$row){
+    $pid = (int)($row['product_id'] ?? 0);
+    if ($pid > 0){
+      $stock = (int)($stockMap[$pid] ?? 0);
+      $resTotal = (int)($reservedTotal[$pid] ?? 0);
+      $resThis = (int)($reservedByOrder[$pid] ?? 0);
+      $resOther = $resTotal - $resThis;
+      if ($resOther < 0) $resOther = 0;
+      $availableForOrder = $stock - $resOther;
+      if ($availableForOrder < 0) $availableForOrder = 0;
+      $need = (int)($row['qty'] ?? 0);
+      $shortage = $need > $availableForOrder ? ($need - $availableForOrder) : 0;
+      $row['available_qty'] = $availableForOrder;
+      $row['reserved_by_order'] = $resThis;
+      $row['reserved_other'] = $resOther;
+      $row['shortage_qty'] = $shortage;
+    } else {
+      $row['available_qty'] = null;
+      $row['reserved_by_order'] = null;
+      $row['reserved_other'] = null;
+      $row['shortage_qty'] = null;
+    }
+  }
+  unset($row);
+  return $items;
+}
+
 function stock_attach_product_stats(PDO $pdo, array $rows): array {
   if (!$rows) return $rows;
   stock_bootstrap($pdo);
@@ -628,6 +706,7 @@ try {
 
   if (($segments[0] ?? '') === 'orders'){
     $pdo = db();
+    order_bootstrap($pdo);
 
     if ($method === 'GET' && count($segments) === 1){
       $status = $_GET['status'] ?? null;
@@ -688,9 +767,7 @@ try {
         $stmt->execute([':id'=>$id]);
         $o = $stmt->fetch();
         if (!$o) out(404, ['error'=>'nf']);
-        $it = $pdo->prepare("SELECT id, product_id, name, price, qty FROM order_items WHERE order_id = :id ORDER BY id ASC");
-        $it->execute([':id'=>$id]);
-        $o['items'] = $it->fetchAll();
+        $o['items'] = order_items_with_availability($pdo, $id);
         out(200, $o);
       }
 
@@ -700,13 +777,31 @@ try {
         $stmt->execute([':id'=>$id]);
         $prev = $stmt->fetch();
         if (!$prev) out(404, ['error'=>'nf']);
-        $fields = ['note','cancel_reason','customer_name','phone','email','total','status'];
+        $fields = ['note','cancel_reason','customer_name','phone','email','total','status','delivery_type','delivery_address','payment_status','payment_method','payment_amount','payment_date','checklist_contacted','checklist_confirmed','checklist_picked','checklist_shipped','checklist_docs'];
         $set = [];
         $args = [':id'=>$id];
         foreach($fields as $f){
           if (array_key_exists($f, $b)){
             $set[] = "$f = :$f";
-            $args[":$f"] = in_array($f, ['total']) ? (float)$b[$f] : (string)$b[$f];
+            if (in_array($f, ['total','payment_amount'], true)){
+              $args[":$f"] = (float)$b[$f];
+            } elseif (in_array($f, ['checklist_contacted','checklist_confirmed','checklist_picked','checklist_shipped','checklist_docs'], true)){
+              $args[":$f"] = !empty($b[$f]) ? 1 : 0;
+            } elseif ($f === 'payment_method'){
+              $pm = (string)$b[$f];
+              if (!in_array($pm, ['cash','card','transfer','bank'], true)) $pm = 'bank';
+              $args[":$f"] = $pm;
+            } elseif ($f === 'payment_status'){
+              $ps = (string)$b[$f];
+              if (!in_array($ps, ['unpaid','partial','paid'], true)) $ps = 'unpaid';
+              $args[":$f"] = $ps;
+            } elseif ($f === 'delivery_type'){
+              $dt = (string)$b[$f];
+              if (!in_array($dt, ['pickup','delivery'], true)) $dt = 'pickup';
+              $args[":$f"] = $dt;
+            } else {
+              $args[":$f"] = (string)$b[$f];
+            }
           }
         }
         if (!$set) out(400, ['error'=>'no_fields']);
@@ -714,8 +809,7 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($args);
         $newStatus = array_key_exists('status', $b) ? (string)$b['status'] : (string)$prev['status'];
-        $newTotal  = array_key_exists('total', $b) ? (float)$b['total'] : (float)$prev['total'];
-        cf_sync_order($pdo, $id, (string)$prev['status'], $newStatus, $newTotal);
+        cf_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         stock_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         out(200, ['ok'=>true]);
       }
@@ -739,7 +833,7 @@ try {
       if (!$prev) out(404, ['error'=>'nf']);
       $stmt = $pdo->prepare("UPDATE orders SET status = :s WHERE id = :id");
       $stmt->execute([':s'=>$st, ':id'=>$id]);
-      cf_sync_order($pdo, $id, (string)$prev['status'], (string)$st, (float)$prev['total']);
+      cf_sync_order($pdo, $id, (string)$prev['status'], (string)$st);
       stock_sync_order($pdo, $id, (string)$prev['status'], (string)$st);
       out(200, ['ok'=>true]);
     }
