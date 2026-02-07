@@ -332,9 +332,68 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
     $prod = $prodByOrder[$pid] ?? null;
     if ($missing > 0){
       if ($prod){
-        $newQty = (int)$prod['qty_done'] + $missing;
-        $upd = $pdo->prepare("UPDATE production_orders SET qty = :q, status='open' WHERE id = :id");
-        $upd->execute([':q'=>$newQty, ':id'=>$prod['id']]);
+        $qtyDone = (int)$prod['qty_done'];
+        $target = max($missing, $qtyDone);
+        $newStatus = ($qtyDone >= $target) ? 'closed' : 'open';
+        $upd = $pdo->prepare("UPDATE production_orders SET qty = :q, status = :st WHERE id = :id");
+        $upd->execute([':q'=>$target, ':st'=>$newStatus, ':id'=>$prod['id']]);
+      } else {
+        $ins = $pdo->prepare("INSERT INTO production_orders (product_id, order_id, qty, qty_done, status, comment, created_by)
+          VALUES (:pid,:oid,:q,0,'open',:cmt,:cb)");
+        $ins->execute([
+          ':pid'=>$pid,
+          ':oid'=>$orderId,
+          ':q'=>$missing,
+          ':cmt'=>'Под заказ #'.$orderId,
+          ':cb'=>'admin',
+        ]);
+      }
+    } else {
+      if ($prod){
+        $upd = $pdo->prepare("UPDATE production_orders SET status='cancelled' WHERE id = :id");
+        $upd->execute([':id'=>$prod['id']]);
+      }
+    }
+  }
+}
+
+function stock_plan_order(PDO $pdo, int $orderId){
+  stock_bootstrap($pdo);
+  $orderStmt = $pdo->prepare("SELECT id FROM orders WHERE id = :id");
+  $orderStmt->execute([':id'=>$orderId]);
+  if (!$orderStmt->fetch()) return;
+
+  $itemsStmt = $pdo->prepare("SELECT product_id, qty FROM order_items WHERE order_id = :id");
+  $itemsStmt->execute([':id'=>$orderId]);
+  $items = $itemsStmt->fetchAll();
+  if (!$items) return;
+
+  $productIds = array_values(array_unique(array_map(fn($x)=>(int)$x['product_id'], $items)));
+  $in = implode(',', array_map('intval', $productIds));
+  $products = $pdo->query("SELECT id, stock_qty, supply_mode FROM products WHERE id IN ($in)")->fetchAll();
+  $productMap = [];
+  foreach ($products as $p){ $productMap[(int)$p['id']] = $p; }
+
+  $reservedTotal = stock_reserved_map($pdo, $productIds);
+  $prodByOrder = stock_production_by_order($pdo, $orderId);
+
+  foreach ($items as $it){
+    $pid = (int)$it['product_id'];
+    $orderQty = (int)$it['qty'];
+    $p = $productMap[$pid] ?? null;
+    if (!$p) continue;
+    $mode = $p['supply_mode'] ?: 'stock';
+
+    $available = max(0, (int)$p['stock_qty'] - (int)($reservedTotal[$pid] ?? 0));
+    $missing = ($mode === 'mto') ? $orderQty : max(0, $orderQty - $available);
+    $prod = $prodByOrder[$pid] ?? null;
+    if ($missing > 0){
+      if ($prod){
+        $qtyDone = (int)$prod['qty_done'];
+        $target = max($missing, $qtyDone);
+        $newStatus = ($qtyDone >= $target) ? 'closed' : 'open';
+        $upd = $pdo->prepare("UPDATE production_orders SET qty = :q, status = :st WHERE id = :id");
+        $upd->execute([':q'=>$target, ':st'=>$newStatus, ':id'=>$prod['id']]);
       } else {
         $ins = $pdo->prepare("INSERT INTO production_orders (product_id, order_id, qty, qty_done, status, comment, created_by)
           VALUES (:pid,:oid,:q,0,'open',:cmt,:cb)");
@@ -373,6 +432,22 @@ function stock_cancel_order(PDO $pdo, int $orderId){
       ->execute([':oid'=>$orderId]);
 }
 
+function stock_release_reserve(PDO $pdo, int $orderId){
+  stock_bootstrap($pdo);
+  $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
+  foreach ($reservedByOrder as $pid=>$qty){
+    if ($qty <= 0) continue;
+    stock_insert_movement($pdo, [
+      'product_id'=>$pid,
+      'qty'=>$qty,
+      'type'=>'release',
+      'reason'=>'order',
+      'order_id'=>$orderId,
+      'comment'=>'Снятие резерва #'.$orderId,
+    ]);
+  }
+}
+
 function stock_fulfill_order(PDO $pdo, int $orderId){
   stock_bootstrap($pdo);
   $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
@@ -407,13 +482,43 @@ function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $ne
     if (in_array($newStatus, $reserveStatuses, true)){
       stock_apply_reservation($pdo, $orderId);
     } elseif ($newStatus === 'Выполнен') {
+      stock_apply_reservation($pdo, $orderId);
       stock_fulfill_order($pdo, $orderId);
+    } elseif ($newStatus === 'Новый') {
+      stock_release_reserve($pdo, $orderId);
+      stock_plan_order($pdo, $orderId);
     } else {
       stock_cancel_order($pdo, $orderId);
     }
   } catch (Throwable $e) {
     // intentionally ignore to avoid breaking order flow
   }
+}
+
+function stock_attach_product_stats(PDO $pdo, array $rows): array {
+  if (!$rows) return $rows;
+  stock_bootstrap($pdo);
+  $ids = array_values(array_unique(array_map(fn($x)=>(int)($x['id'] ?? 0), $rows)));
+  $ids = array_filter($ids, fn($x)=>$x>0);
+  if (!$ids) return $rows;
+  $reserved = stock_reserved_map($pdo, $ids);
+  $onOrder  = stock_on_order_map($pdo, $ids);
+  foreach ($rows as &$r){
+    $id = (int)($r['id'] ?? 0);
+    $res = (int)($reserved[$id] ?? 0);
+    $on  = (int)($onOrder[$id] ?? 0);
+    $stock = (int)($r['stock_qty'] ?? 0);
+    $avail = $stock - $res;
+    if ($avail < 0) $avail = 0;
+    $r['reserved_qty'] = $res;
+    $r['available_qty'] = $avail;
+    $r['on_order_qty'] = $on;
+    if (!isset($r['supply_mode']) || $r['supply_mode'] === null || $r['supply_mode'] === '') {
+      $r['supply_mode'] = 'stock';
+    }
+  }
+  unset($r);
+  return $rows;
 }
 
 $uri = strtok($_SERVER['REQUEST_URI'], '?');
@@ -433,6 +538,7 @@ try {
 
   if (($segments[0] ?? '') === 'products'){
     $pdo = db();
+    stock_bootstrap($pdo);
 
     if ($method === 'GET' && count($segments) === 1){
       $published = isset($_GET['published']) ? $_GET['published'] : null;
@@ -442,15 +548,18 @@ try {
         $stmt = $pdo->query("SELECT * FROM products ORDER BY id ASC");
       }
       $rows = $stmt->fetchAll();
+      $rows = stock_attach_product_stats($pdo, $rows);
       out(200, $rows);
     }
 
     if ($method === 'POST' && count($segments) === 1){
       $b = read_json();
       if (!isset($b['name']) || trim((string)$b['name']) === '') out(400, ['error'=>'name']);
+      $mode = (string)($b['supply_mode'] ?? 'stock');
+      if (!in_array($mode, ['stock','mto','mixed'], true)) $mode = 'stock';
       $stmt = $pdo->prepare("INSERT INTO products
-        (name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, lead_time_days)
-        VALUES (:name, :price, :published, :image_url, :shelves, :material, :construction, :perforation, :shelf_thickness, :description, :stock_qty, :lead_time_days)");
+        (name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, lead_time_days, supply_mode)
+        VALUES (:name, :price, :published, :image_url, :shelves, :material, :construction, :perforation, :shelf_thickness, :description, :stock_qty, :lead_time_days, :supply_mode)");
       $stmt->execute([
         ':name' => (string)$b['name'],
         ':price' => (float)($b['price'] ?? 0),
@@ -464,6 +573,7 @@ try {
         ':description' => (string)($b['description'] ?? ''),
         ':stock_qty' => (int)($b['stock_qty'] ?? 0),
         ':lead_time_days' => (int)($b['lead_time_days'] ?? 0),
+        ':supply_mode' => $mode,
       ]);
       $id = (int)$pdo->lastInsertId();
       out(200, ['id'=>$id]);
@@ -472,17 +582,32 @@ try {
     if (count($segments) === 2){
       $id = (int)$segments[1];
 
+      if ($method === 'GET'){
+        $stmt = $pdo->prepare("SELECT * FROM products WHERE id = :id");
+        $stmt->execute([':id'=>$id]);
+        $row = $stmt->fetch();
+        if (!$row) out(404, ['error'=>'nf']);
+        $rows = stock_attach_product_stats($pdo, [$row]);
+        out(200, $rows[0] ?? $row);
+      }
+
       if ($method === 'PUT' || $method === 'PATCH'){
         $b = read_json();
-        $fields = ['name','price','published','image_url','shelves','material','construction','perforation','shelf_thickness','description','stock_qty','lead_time_days'];
+        $fields = ['name','price','published','image_url','shelves','material','construction','perforation','shelf_thickness','description','stock_qty','lead_time_days','supply_mode'];
         $set = [];
         $args = [':id'=>$id];
         foreach($fields as $f){
           if (array_key_exists($f, $b)){
             $set[] = "$f = :$f";
-            $args[":$f"] = in_array($f, ['price']) ? (float)$b[$f]
+            if ($f === 'supply_mode'){
+              $mode = (string)$b[$f];
+              if (!in_array($mode, ['stock','mto','mixed'], true)) $mode = 'stock';
+              $args[":$f"] = $mode;
+            } else {
+              $args[":$f"] = in_array($f, ['price']) ? (float)$b[$f]
               : (in_array($f, ['shelves','stock_qty','lead_time_days']) ? (int)$b[$f]
               : ($f==='published' ? (!empty($b[$f]) ? 1 : 0) : (string)$b[$f]));
+            }
           }
         }
         if (!$set) out(400, ['error'=>'no_fields']);
@@ -547,6 +672,7 @@ try {
           ]);
         }
         $pdo->commit();
+        try { stock_plan_order($pdo, $oid); } catch (Throwable $e) {}
         out(200, ['id'=>$oid]);
       }catch(Throwable $e){
         $pdo->rollBack();
@@ -590,10 +716,12 @@ try {
         $newStatus = array_key_exists('status', $b) ? (string)$b['status'] : (string)$prev['status'];
         $newTotal  = array_key_exists('total', $b) ? (float)$b['total'] : (float)$prev['total'];
         cf_sync_order($pdo, $id, (string)$prev['status'], $newStatus, $newTotal);
+        stock_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         out(200, ['ok'=>true]);
       }
 
       if ($method === 'DELETE'){
+        try { stock_cancel_order($pdo, $id); } catch (Throwable $e) {}
         $stmt = $pdo->prepare("DELETE FROM orders WHERE id = :id");
         $stmt->execute([':id'=>$id]);
         out(200, ['ok'=>true]);
@@ -612,6 +740,7 @@ try {
       $stmt = $pdo->prepare("UPDATE orders SET status = :s WHERE id = :id");
       $stmt->execute([':s'=>$st, ':id'=>$id]);
       cf_sync_order($pdo, $id, (string)$prev['status'], (string)$st, (float)$prev['total']);
+      stock_sync_order($pdo, $id, (string)$prev['status'], (string)$st);
       out(200, ['ok'=>true]);
     }
 
@@ -762,6 +891,152 @@ try {
         $stmt = $pdo->prepare("DELETE FROM cashflow_entries WHERE id = :id");
         $stmt->execute([':id'=>$id]);
         out(200, ['ok'=>true]);
+      }
+    }
+
+    out(404, ['error'=>'nf']);
+  }
+
+  if (($segments[0] ?? '') === 'stock'){
+    $pdo = db();
+    stock_bootstrap($pdo);
+    $sub = $segments[1] ?? '';
+
+    if ($method === 'GET' && count($segments) === 1){
+      $stmt = $pdo->query("SELECT id, name, stock_qty, supply_mode FROM products ORDER BY id ASC");
+      $rows = $stmt->fetchAll();
+      $rows = stock_attach_product_stats($pdo, $rows);
+      out(200, $rows);
+    }
+
+    if ($sub === 'movements' && $method === 'GET'){
+      $pid = isset($_GET['product_id']) ? (int)$_GET['product_id'] : 0;
+      $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 300;
+      if ($limit < 1) $limit = 1;
+      if ($limit > 1000) $limit = 1000;
+      if ($pid > 0){
+        $stmt = $pdo->prepare("SELECT m.*, p.name AS product_name
+          FROM stock_movements m LEFT JOIN products p ON p.id = m.product_id
+          WHERE m.product_id = :pid ORDER BY m.id DESC LIMIT $limit");
+        $stmt->execute([':pid'=>$pid]);
+      } else {
+        $stmt = $pdo->query("SELECT m.*, p.name AS product_name
+          FROM stock_movements m LEFT JOIN products p ON p.id = m.product_id
+          ORDER BY m.id DESC LIMIT $limit");
+      }
+      out(200, $stmt->fetchAll());
+    }
+
+    if ($sub === 'upload' && $method === 'POST'){
+      if (empty($_FILES['file']) || !is_array($_FILES['file'])) out(400, ['error'=>'no_file']);
+      $file = $_FILES['file'];
+      if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) out(400, ['error'=>'upload']);
+      $orig = (string)($file['name'] ?? 'file');
+      $ext = pathinfo($orig, PATHINFO_EXTENSION);
+      $safeExt = $ext ? ('.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext)) : '';
+      $dir = __DIR__ . '/../uploads/stock_docs';
+      if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+      $name = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . $safeExt;
+      $dest = $dir . '/' . $name;
+      if (!move_uploaded_file($file['tmp_name'], $dest)) out(500, ['error'=>'save']);
+      $url = '/uploads/stock_docs/' . $name;
+      out(200, ['url'=>$url, 'name'=>$orig]);
+    }
+
+    if ($sub === 'incoming' && $method === 'POST'){
+      $b = read_json();
+      $doc = is_array($b['doc'] ?? null) ? $b['doc'] : [];
+      $items = is_array($b['items'] ?? null) ? $b['items'] : [];
+      if (!$items) out(400, ['error'=>'no_items']);
+
+      $docType = (string)($doc['doc_type'] ?? 'other');
+      if (!in_array($docType, ['invoice','act','receipt','other'], true)) $docType = 'other';
+      $docNumber = trim((string)($doc['doc_number'] ?? ''));
+      $docDate = trim((string)($doc['doc_date'] ?? ''));
+      $supplier = trim((string)($doc['supplier'] ?? ''));
+      $fileUrl = trim((string)($doc['file_url'] ?? ''));
+      $docComment = trim((string)($doc['comment'] ?? ''));
+      $createdBy = trim((string)($b['created_by'] ?? 'admin')) ?: 'admin';
+
+      $pdo->beginTransaction();
+      try{
+        $stmt = $pdo->prepare("INSERT INTO stock_docs (doc_type, doc_number, doc_date, supplier, file_url, comment, created_by)
+          VALUES (:t,:n,:d,:s,:f,:c,:cb)");
+        $stmt->execute([
+          ':t'=>$docType,
+          ':n'=>$docNumber ?: null,
+          ':d'=>$docDate ?: null,
+          ':s'=>$supplier ?: null,
+          ':f'=>$fileUrl ?: null,
+          ':c'=>$docComment ?: null,
+          ':cb'=>$createdBy,
+        ]);
+        $docId = (int)$pdo->lastInsertId();
+
+        $insItem = $pdo->prepare("INSERT INTO stock_doc_items (doc_id, product_id, qty, price) VALUES (:doc,:pid,:qty,:price)");
+        foreach ($items as $it){
+          $pid = isset($it['product_id']) ? (int)$it['product_id'] : 0;
+          $qty = isset($it['qty']) ? (int)$it['qty'] : 0;
+          $price = isset($it['price']) ? (float)$it['price'] : null;
+          if ($pid <= 0 || $qty <= 0) continue;
+
+          $insItem->execute([':doc'=>$docId, ':pid'=>$pid, ':qty'=>$qty, ':price'=>$price]);
+          $pdo->prepare("UPDATE products SET stock_qty = stock_qty + :q WHERE id = :id")
+              ->execute([':q'=>$qty, ':id'=>$pid]);
+          stock_insert_movement($pdo, [
+            'product_id'=>$pid,
+            'qty'=>$qty,
+            'type'=>'in',
+            'reason'=>'purchase',
+            'doc_id'=>$docId,
+            'comment'=>$docComment ?: 'Приход',
+            'created_by'=>$createdBy,
+          ]);
+          stock_apply_production_on_incoming($pdo, $pid, $qty);
+        }
+        $pdo->commit();
+        out(200, ['doc_id'=>$docId]);
+      }catch(Throwable $e){
+        $pdo->rollBack();
+        out(500, ['error'=>'fail']);
+      }
+    }
+
+    if ($sub === 'adjust' && $method === 'POST'){
+      $b = read_json();
+      $pid = isset($b['product_id']) ? (int)$b['product_id'] : 0;
+      $delta = isset($b['qty']) ? (int)$b['qty'] : 0;
+      $comment = trim((string)($b['comment'] ?? ''));
+      $createdBy = trim((string)($b['created_by'] ?? 'admin')) ?: 'admin';
+      if ($pid <= 0 || $delta === 0) out(400, ['error'=>'bad']);
+
+      $pdo->beginTransaction();
+      try{
+        $stmt = $pdo->prepare("SELECT stock_qty FROM products WHERE id = :id");
+        $stmt->execute([':id'=>$pid]);
+        $row = $stmt->fetch();
+        if (!$row){ $pdo->rollBack(); out(404, ['error'=>'nf']); }
+        $cur = (int)$row['stock_qty'];
+        $new = $cur + $delta;
+        if ($new < 0) $new = 0;
+        $applied = $new - $cur;
+        $pdo->prepare("UPDATE products SET stock_qty = :q WHERE id = :id")
+            ->execute([':q'=>$new, ':id'=>$pid]);
+        if ($applied !== 0){
+          stock_insert_movement($pdo, [
+            'product_id'=>$pid,
+            'qty'=>$applied,
+            'type'=>'adjust',
+            'reason'=>'manual',
+            'comment'=>$comment ?: 'Корректировка',
+            'created_by'=>$createdBy,
+          ]);
+        }
+        $pdo->commit();
+        out(200, ['ok'=>true, 'qty'=>$new]);
+      }catch(Throwable $e){
+        $pdo->rollBack();
+        out(500, ['error'=>'fail']);
       }
     }
 

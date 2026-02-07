@@ -196,6 +196,23 @@
 #dds-right-table tbody tr.dds-void { opacity:.6; }
 .dds-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
 </style>
+<style>
+/* ===== Stock UI ===== */
+.stock-toolbar{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#stock-left-table, #stock-right-table{table-layout:fixed}
+#stock-left-table td.actions, #stock-right-table td.actions{overflow:hidden}
+.stock-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px}
+.stock-row{display:grid;grid-template-columns:1fr 120px 120px 40px;gap:8px;align-items:center}
+.stock-row--head{font-size:12px;color:var(--muted);font-weight:700}
+.stock-rows{display:grid;gap:8px}
+.stock-row select,.stock-row input{width:100%}
+.stock-file-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stock-file-row input[type=\"file\"]{border:none;padding:0}
+.stock-mini{font-size:12px;color:var(--muted)}
+@media (max-width: 900px){
+  .stock-row{grid-template-columns:1fr 90px 90px 36px}
+}
+</style>
 
 
 </head>
@@ -215,6 +232,7 @@
       <button class="ghost" id="open-products-left">Товары</button>
       <button class="ghost" id="open-stats-left">Статистика</button>
       <button class="ghost" id="open-orders-left">Заказы</button>
+      <button class="ghost" id="open-stock-left">Учет товара</button>
       <button class="ghost" id="open-dds-left">ДДС</button>
     </div>
   </div>
@@ -298,6 +316,38 @@
     </div>
   </div>
 
+  <div id="stock-left" style="display:none">
+    <div class="card-head" style="margin-top:-8px">
+      <h3 class="card-title">Учет товара</h3>
+      <div class="stock-toolbar">
+        <input id="stock-search-left" type="text" placeholder="Поиск товара">
+        <button id="stock-refresh-left" class="ghost">Обновить</button>
+        <button id="stock-in-left">+ Приход</button>
+        <button id="stock-adjust-left" class="ghost">Корректировка</button>
+        <button id="stock-upd-left" class="ghost">УПД</button>
+        <button class="ghost" id="close-stock-left">Закрыть</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="scroll-area" id="stock-pane-left">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <div id="stock-kpi-left" class="muted" style="padding:8px 8px 12px"></div>
+        <table id="stock-left-table">
+          <colgroup>
+            <col style="width:70px"><col style="width:360px"><col style="width:90px"><col style="width:90px">
+            <col style="width:100px"><col style="width:110px"><col style="width:140px">
+          </colgroup>
+          <thead>
+          <tr>
+            <th>ID</th><th>Название</th><th>Склад</th><th>Резерв</th><th>Доступно</th><th>Под заказ</th><th></th>
+          </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div id="dds-left" style="display:none">
     <div class="card-head" style="margin-top:-8px">
       <h3 class="card-title">ДДС</h3>
@@ -362,6 +412,7 @@
           <button class="ghost" id="open-products">Товары</button>
           <button class="ghost" id="open-stats">Статистика</button>
           <button class="ghost" id="open-orders-right">Заказы</button>
+          <button class="ghost" id="open-stock">Учет товара</button>
           <button class="ghost" id="open-dds">ДДС</button>
         </div>
       </div>
@@ -438,6 +489,38 @@
                   <th><span class="th-sort" data-col="status">Статус <i class="carret"></i></span></th>
                   <th></th>
                 </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="stock-right" style="display:none">
+        <div class="card-head" style="margin-top:-8px">
+          <h3 class="card-title">Учет товара</h3>
+          <div class="stock-toolbar">
+            <input id="stock-search-right" type="text" placeholder="Поиск товара">
+            <button id="stock-refresh-right" class="ghost">Обновить</button>
+            <button id="stock-in-right">+ Приход</button>
+            <button id="stock-adjust-right" class="ghost">Корректировка</button>
+            <button id="stock-upd-right" class="ghost">УПД</button>
+            <button class="ghost" id="close-stock-right">Закрыть</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="scroll-area" id="stock-pane-right">
+            <div class="pane-overlay"><div class="pane-spinner"></div></div>
+            <div id="stock-kpi-right" class="muted" style="padding:8px 8px 12px"></div>
+            <table id="stock-right-table">
+              <colgroup>
+                <col style="width:70px"><col style="width:360px"><col style="width:90px"><col style="width:90px">
+                <col style="width:100px"><col style="width:110px"><col style="width:140px">
+              </colgroup>
+              <thead>
+              <tr>
+                <th>ID</th><th>Название</th><th>Склад</th><th>Резерв</th><th>Доступно</th><th>Под заказ</th><th></th>
+              </tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -612,6 +695,133 @@
   </div>
 </div>
 
+<!-- Модалка: приход товара -->
+<div class="modal-backdrop" id="stock-in-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stock-in-title" style="width:min(980px,96vw)">
+    <div class="modal-head">
+      <h3 id="stock-in-title" class="card-title" style="margin:0">Приход товара</h3>
+      <button class="close-x" id="stock-in-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Тип документа</label>
+            <select id="stock-doc-type">
+              <option value="invoice">Накладная</option>
+              <option value="act">Акт</option>
+              <option value="receipt">Квитанция</option>
+              <option value="other">Другое</option>
+            </select>
+          </div>
+          <div class="adm-field">
+            <label>Номер документа</label>
+            <input type="text" id="stock-doc-number" placeholder="Например: 123/А">
+          </div>
+          <div class="adm-field">
+            <label>Дата документа</label>
+            <input type="date" id="stock-doc-date">
+          </div>
+          <div class="adm-field">
+            <label>Поставщик</label>
+            <input type="text" id="stock-doc-supplier" placeholder="Компания или ИП">
+          </div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Комментарий</label>
+            <textarea id="stock-doc-comment" rows="4" placeholder="Любые детали (необязательно)"></textarea>
+          </div>
+          <div class="adm-field">
+            <label>Файл документа (необязательно)</label>
+            <div class="stock-file-row">
+              <input type="file" id="stock-doc-file">
+              <span class="stock-mini" id="stock-doc-file-label">Файл не выбран</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="stock-row stock-row--head">
+          <div>Товар</div><div>Кол-во</div><div>Цена</div><div></div>
+        </div>
+        <div id="stock-in-items" class="stock-rows"></div>
+        <div style="margin-top:8px">
+          <button class="ghost" id="stock-in-add-row">+ Добавить позицию</button>
+        </div>
+      </div>
+
+      <div class="adm-actions">
+        <button class="adm-btn adm-btn--ghost" id="stock-in-cancel">Отмена</button>
+        <button class="adm-btn adm-btn--accent" id="stock-in-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: корректировка склада -->
+<div class="modal-backdrop" id="stock-adjust-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stock-adjust-title" style="width:min(720px,96vw)">
+    <div class="modal-head">
+      <h3 id="stock-adjust-title" class="card-title" style="margin:0">Корректировка</h3>
+      <button class="close-x" id="stock-adjust-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Товар</label>
+            <select id="stock-adjust-product"></select>
+          </div>
+          <div class="adm-field">
+            <label>Изменение, шт.</label>
+            <input type="number" id="stock-adjust-qty" step="1" placeholder="Например: -2 или 5">
+          </div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Комментарий</label>
+            <textarea id="stock-adjust-comment" rows="4" placeholder="Причина корректировки (необязательно)"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="adm-actions">
+        <button class="adm-btn adm-btn--ghost" id="stock-adjust-cancel">Отмена</button>
+        <button class="adm-btn adm-btn--accent" id="stock-adjust-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: движения по товару -->
+<div class="modal-backdrop" id="stock-movements-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stock-movements-title" style="width:min(1100px,96vw)">
+    <div class="modal-head">
+      <h3 id="stock-movements-title" class="card-title" style="margin:0">Движения товара</h3>
+      <button class="close-x" id="stock-movements-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div class="scroll-area" id="stock-movements-pane" style="max-height:70vh">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <table id="stock-movements-table">
+          <colgroup>
+            <col style="width:140px"><col style="width:140px"><col style="width:90px"><col style="width:120px">
+            <col style="width:90px"><col style="width:90px"><col style="width:300px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Дата</th><th>Тип</th><th>Кол-во</th><th>Причина</th>
+              <th>Заказ</th><th>Док</th><th>Комментарий</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   /* API */
   window.api = async (path, opts = {}) => {
@@ -749,10 +959,11 @@ async function loadOrdersInto(tbodySel, paneId, statusFilterId, sortState){
     tbody.querySelectorAll('.status-select').forEach(sel=>{
       sel.addEventListener('change', async e=>{
         const id=e.target.dataset.id, newStatus=e.target.value;
-        await withOverlay(e.target, async ()=>{
+          await withOverlay(e.target, async ()=>{
           await api('/api/orders/'+id+'/status',{method:'PATCH', body: JSON.stringify({status:newStatus})});
           const idx=ordersCache.findIndex(x=>String(x.id)===String(id)); if(idx>-1) ordersCache[idx].status=newStatus; applyRowStatusClass(e.target.closest('tr'), newStatus);
           ddsRefreshOpen();
+          stockRefreshOpen();
         });
       });
     });
@@ -1226,6 +1437,282 @@ async function exportDds(side){
   ddsDownload(ddsToXLSBlob(csv), `dds_${side}`);
 }
 
+/* ===== СКЛАД ===== */
+const stockTypeLabels = { in:'Приход', out:'Списание', reserve:'Резерв', release:'Снятие резерва', adjust:'Корректировка' };
+const stockReasonLabels = { purchase:'Закупка', order:'Заказ', writeoff:'Списание', manual:'Вручную', production:'Производство' };
+const stockState = { list: [] };
+
+function stockNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function stockFmt(v){ return stockNum(v).toLocaleString('ru-RU'); }
+
+async function stockFetchList(force=false){
+  if (!force && stockState.list.length) return stockState.list;
+  try{
+    const res = await api('/api/stock');
+    stockState.list = res.ok ? await res.json() : [];
+  }catch(_){ stockState.list = []; }
+  return stockState.list;
+}
+
+function stockFilterList(list, q){
+  if (!q) return list;
+  const s = q.toLowerCase();
+  return (list || []).filter(p=>{
+    const name = (p.name || '').toLowerCase();
+    const id = String(p.id || '');
+    return name.includes(s) || id.includes(s);
+  });
+}
+
+function stockRenderKpi(kpiEl, list){
+  if (!kpiEl) return;
+  const totalStock = list.reduce((s,p)=> s + stockNum(p.stock_qty), 0);
+  const totalReserved = list.reduce((s,p)=> s + stockNum(p.reserved_qty), 0);
+  const totalAvailable = list.reduce((s,p)=> s + stockNum(p.available_qty), 0);
+  const totalOnOrder = list.reduce((s,p)=> s + stockNum(p.on_order_qty), 0);
+  kpiEl.innerHTML = `
+    <div class="stock-kpi-grid">
+      <div class="stat-card"><div class="stat-title">Склад</div><div class="stat-value">${stockFmt(totalStock)} шт.</div></div>
+      <div class="stat-card"><div class="stat-title">Резерв</div><div class="stat-value">${stockFmt(totalReserved)} шт.</div></div>
+      <div class="stat-card"><div class="stat-title">Доступно</div><div class="stat-value">${stockFmt(totalAvailable)} шт.</div></div>
+      <div class="stat-card"><div class="stat-title">Под заказ</div><div class="stat-value">${stockFmt(totalOnOrder)} шт.</div></div>
+      <div class="stat-card"><div class="stat-title">Позиций</div><div class="stat-value">${(list || []).length}</div></div>
+    </div>
+  `;
+  kpiEl.classList && kpiEl.classList.remove('muted');
+}
+
+async function loadStock(side, force=false){
+  const pane = document.getElementById(`stock-pane-${side}`);
+  const tbody = document.querySelector(`#stock-${side}-table tbody`);
+  const kpi = document.getElementById(`stock-kpi-${side}`);
+  if (!pane || !tbody || !kpi) return;
+  const cols = document.querySelector(`#stock-${side}-table colgroup`).children.length;
+  tbody.innerHTML = skeletonRows(cols, 8);
+  await withOverlay(pane, async ()=>{
+    const list = await stockFetchList(force);
+    const q = (document.getElementById(`stock-search-${side}`)?.value || '').trim();
+    const filtered = stockFilterList(list, q);
+    stockRenderKpi(kpi, filtered);
+    tbody.innerHTML = '';
+    filtered.forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td class="cell-ellipsis">${p.id || ''}</td>` +
+        `<td class="cell-ellipsis">${p.name || ''}</td>` +
+        `<td class="cell-ellipsis">${stockFmt(p.stock_qty)}</td>` +
+        `<td class="cell-ellipsis">${stockFmt(p.reserved_qty)}</td>` +
+        `<td class="cell-ellipsis">${stockFmt(p.available_qty)}</td>` +
+        `<td class="cell-ellipsis">${stockFmt(p.on_order_qty)}</td>` +
+        `<td class="actions"><div class="btns">` +
+          `<button class="ghost stock-move" data-id="${p.id}">Движения</button>` +
+        `</div></td>`;
+      tbody.appendChild(tr);
+    });
+    if (!filtered.length){
+      tbody.innerHTML = `<tr><td colspan="7"><span class="muted">Товаров нет</span></td></tr>`;
+    }
+  });
+}
+
+function stockIsOpen(side){
+  const el = document.getElementById(`stock-${side}`);
+  return el && el.style.display !== 'none';
+}
+function stockRefreshOpen(){
+  if (stockIsOpen('left')) loadStock('left', true);
+  if (stockIsOpen('right')) loadStock('right', true);
+}
+
+function stockBuildOptions(selectedId){
+  const list = stockState.list || [];
+  if (!list.length) return '<option value=\"\">Нет товаров</option>';
+  return list.map(p=>{
+    const id = String(p.id || '');
+    const sel = selectedId && String(selectedId) === id ? 'selected' : '';
+    return `<option value=\"${id}\" ${sel}>${(p.name || ('Товар #' + id))}</option>`;
+  }).join('');
+}
+
+function stockResetIncomingRows(){
+  const wrap = document.getElementById('stock-in-items');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  stockAddIncomingRow();
+}
+
+function stockAddIncomingRow(prefill = {}){
+  const wrap = document.getElementById('stock-in-items');
+  if (!wrap) return;
+  const row = document.createElement('div');
+  row.className = 'stock-row';
+  row.innerHTML = `
+    <select class="stock-in-product">${stockBuildOptions(prefill.product_id)}</select>
+    <input type="number" class="stock-in-qty" min="1" step="1" value="${prefill.qty ?? 1}">
+    <input type="number" class="stock-in-price" min="0" step="0.01" placeholder="—" value="${prefill.price ?? ''}">
+    <button class="ghost stock-row-remove" title="Удалить">✕</button>
+  `;
+  row.querySelector('.stock-row-remove')?.addEventListener('click', ()=> row.remove());
+  wrap.appendChild(row);
+}
+
+async function stockIncomingOpen(){
+  await stockFetchList();
+  const back = document.getElementById('stock-in-backdrop');
+  if (!back) return;
+  document.getElementById('stock-doc-type').value = 'invoice';
+  document.getElementById('stock-doc-number').value = '';
+  document.getElementById('stock-doc-date').value = '';
+  document.getElementById('stock-doc-supplier').value = '';
+  document.getElementById('stock-doc-comment').value = '';
+  const fileInput = document.getElementById('stock-doc-file');
+  if (fileInput) fileInput.value = '';
+  const label = document.getElementById('stock-doc-file-label');
+  if (label) label.textContent = 'Файл не выбран';
+  stockResetIncomingRows();
+  back.style.display = 'flex';
+}
+
+function stockIncomingClose(){
+  const back = document.getElementById('stock-in-backdrop');
+  if (back) back.style.display = 'none';
+}
+
+async function stockUploadFile(file){
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/stock/upload', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'x-dev-auth': '1' },
+    body: fd
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data && data.url ? data.url : null;
+}
+
+async function stockIncomingSave(){
+  const items = [];
+  document.querySelectorAll('#stock-in-items .stock-row').forEach(row=>{
+    const pid = parseInt(row.querySelector('.stock-in-product')?.value || '0', 10) || 0;
+    const qty = parseInt(row.querySelector('.stock-in-qty')?.value || '0', 10) || 0;
+    const priceRaw = row.querySelector('.stock-in-price')?.value || '';
+    const price = priceRaw === '' ? null : parseFloat(priceRaw);
+    if (pid > 0 && qty > 0) items.push({ product_id: pid, qty, price });
+  });
+  if (!items.length){ alert('Добавьте хотя бы одну позицию'); return; }
+
+  const doc = {
+    doc_type: document.getElementById('stock-doc-type')?.value || 'other',
+    doc_number: (document.getElementById('stock-doc-number')?.value || '').trim(),
+    doc_date: (document.getElementById('stock-doc-date')?.value || '').trim(),
+    supplier: (document.getElementById('stock-doc-supplier')?.value || '').trim(),
+    comment: (document.getElementById('stock-doc-comment')?.value || '').trim(),
+    file_url: ''
+  };
+
+  const fileInput = document.getElementById('stock-doc-file');
+  if (fileInput && fileInput.files && fileInput.files[0]){
+    const url = await stockUploadFile(fileInput.files[0]);
+    if (!url){ alert('Не удалось загрузить файл'); return; }
+    doc.file_url = url;
+  }
+
+  try{
+    const res = await api('/api/stock/incoming', {
+      method:'POST',
+      body: JSON.stringify({ doc, items })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    stockIncomingClose();
+    stockRefreshOpen();
+  }catch(err){
+    console.error(err);
+    alert('Не удалось сохранить приход');
+  }
+}
+
+async function stockAdjustOpen(){
+  await stockFetchList();
+  const back = document.getElementById('stock-adjust-backdrop');
+  const sel = document.getElementById('stock-adjust-product');
+  if (sel) sel.innerHTML = stockBuildOptions();
+  document.getElementById('stock-adjust-qty').value = '';
+  document.getElementById('stock-adjust-comment').value = '';
+  if (back) back.style.display = 'flex';
+}
+
+function stockAdjustClose(){
+  const back = document.getElementById('stock-adjust-backdrop');
+  if (back) back.style.display = 'none';
+}
+
+async function stockAdjustSave(){
+  const pid = parseInt(document.getElementById('stock-adjust-product')?.value || '0', 10) || 0;
+  const delta = parseInt(document.getElementById('stock-adjust-qty')?.value || '0', 10) || 0;
+  const comment = (document.getElementById('stock-adjust-comment')?.value || '').trim();
+  if (pid <= 0 || delta === 0){ alert('Укажите товар и изменение'); return; }
+  try{
+    const res = await api('/api/stock/adjust', {
+      method:'POST',
+      body: JSON.stringify({ product_id: pid, qty: delta, comment })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    stockAdjustClose();
+    stockRefreshOpen();
+  }catch(err){
+    console.error(err);
+    alert('Не удалось сохранить корректировку');
+  }
+}
+
+async function stockMovementsOpen(pid){
+  const back = document.getElementById('stock-movements-backdrop');
+  const pane = document.getElementById('stock-movements-pane');
+  const tbody = document.querySelector('#stock-movements-table tbody');
+  const title = document.getElementById('stock-movements-title');
+  if (!back || !pane || !tbody || !title) return;
+  const p = (stockState.list || []).find(x => String(x.id) === String(pid));
+  title.textContent = 'Движения товара — ' + (p?.name || ('#' + pid));
+  back.style.display = 'flex';
+  const cols = document.querySelector('#stock-movements-table colgroup').children.length;
+  tbody.innerHTML = skeletonRows(cols, 6);
+  await withOverlay(pane, async ()=>{
+    const res = await api('/api/stock/movements?product_id=' + encodeURIComponent(pid));
+    const list = res.ok ? await res.json() : [];
+    tbody.innerHTML = '';
+    list.forEach(row=>{
+      const tr = document.createElement('tr');
+      const dt = row.created_at ? new Date(row.created_at).toLocaleString() : '—';
+      const type = stockTypeLabels[row.type] || row.type || '—';
+      let qtyVal = stockNum(row.qty);
+      if (row.type === 'out' || row.type === 'release') qtyVal = -Math.abs(qtyVal);
+      const reason = stockReasonLabels[row.reason] || row.reason || '—';
+      const order = row.order_id ? ('#' + row.order_id) : '—';
+      const doc = row.doc_id ? ('#' + row.doc_id) : '—';
+      const comment = row.comment ? String(row.comment) : '';
+      tr.innerHTML =
+        `<td class="cell-ellipsis">${dt}</td>` +
+        `<td class="cell-ellipsis">${type}</td>` +
+        `<td class="cell-ellipsis">${qtyVal}</td>` +
+        `<td class="cell-ellipsis">${reason}</td>` +
+        `<td class="cell-ellipsis">${order}</td>` +
+        `<td class="cell-ellipsis">${doc}</td>` +
+        `<td class="cell-wrap">${comment || '—'}</td>`;
+      tbody.appendChild(tr);
+    });
+    if (!list.length){
+      tbody.innerHTML = `<tr><td colspan="7"><span class="muted">Движений нет</span></td></tr>`;
+    }
+  });
+}
+
+function stockMovementsClose(){
+  const back = document.getElementById('stock-movements-backdrop');
+  if (back) back.style.display = 'none';
+}
+
 /* ===== СТАТИСТИКА ===== */
 function loadStats(){
   const resultEl = document.getElementById('stats-result');
@@ -1341,11 +1828,13 @@ function loadStats(){
     document.getElementById('products-left').style.display='none';
     document.getElementById('stats-left').style.display='none';
     document.getElementById('orders-left').style.display='none';
+    document.getElementById('stock-left').style.display='none';
     document.getElementById('dds-left').style.display='none';
     const el=document.getElementById(section+'-left'); if(el) el.style.display='block';
     if(section==='products') loadProductsShortInto('products-left-table','products-pane-left');
     if(section==='stats') populateStatProductsLeft();
     if(section==='orders'){ loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); wireOrderSort('#orders-left-table', currentSortLeft, ()=>loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft)); }
+    if(section==='stock'){ loadStock('left'); }
     if(section==='dds'){ loadDds('left'); }
   }
   function backToMenuLeft(){
@@ -1353,16 +1842,19 @@ function loadStats(){
     document.getElementById('products-left').style.display='none';
     document.getElementById('stats-left').style.display='none';
     document.getElementById('orders-left').style.display='none';
+    document.getElementById('stock-left').style.display='none';
     document.getElementById('dds-left').style.display='none';
   }
   document.getElementById('open-products-left').addEventListener('click', ()=>showLeft('products'));
   document.getElementById('open-stats-left').addEventListener('click', ()=>showLeft('stats'));
   document.getElementById('open-orders-left').addEventListener('click', ()=>showLeft('orders'));
+  document.getElementById('open-stock-left').addEventListener('click', ()=>showLeft('stock'));
   const ddsLeft = document.getElementById('open-dds-left');
   if (ddsLeft) ddsLeft.addEventListener('click', ()=>showLeft('dds'));
   document.getElementById('close-products-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-stats-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-orders-left').addEventListener('click', backToMenuLeft);
+  document.getElementById('close-stock-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-dds-left').addEventListener('click', backToMenuLeft);
 
   async function populateStatProductsLeft(){ return; }
@@ -1475,29 +1967,44 @@ async function loadStatsLeft(){
     document.getElementById('products-right').style.display='none';
     document.getElementById('stats-right').style.display='none';
     document.getElementById('orders-right').style.display='none';
+    document.getElementById('stock-right').style.display='none';
     document.getElementById('dds-right').style.display='none';
     const el=document.getElementById(section+'-right'); if(el) el.style.display='block';
     if(section==='products') loadProductsShortInto('products-table','products-pane');
     if(section==='stats') populateStatProducts();
     if(section==='orders'){ loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight); wireOrderSort('#orders-right-table', currentSortRight, ()=>loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight)); }
+    if(section==='stock'){ loadStock('right'); }
     if(section==='dds'){ loadDds('right'); }
   }
-  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; document.getElementById('dds-right').style.display='none'; }
+  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; document.getElementById('stock-right').style.display='none'; document.getElementById('dds-right').style.display='none'; }
 
   document.getElementById('open-products').addEventListener('click', ()=>showRight('products'));
   document.getElementById('open-stats').addEventListener('click', ()=>showRight('stats'));
   document.getElementById('open-orders-right').addEventListener('click', ()=>showRight('orders'));
+  document.getElementById('open-stock').addEventListener('click', ()=>showRight('stock'));
   const ddsRight = document.getElementById('open-dds');
   if (ddsRight) ddsRight.addEventListener('click', ()=>showRight('dds'));
   document.getElementById('close-products').addEventListener('click', backToMenu);
   document.getElementById('close-stats').addEventListener('click', backToMenu);
   document.getElementById('close-orders-right').addEventListener('click', backToMenu);
+  document.getElementById('close-stock-right').addEventListener('click', backToMenu);
   document.getElementById('close-dds-right').addEventListener('click', backToMenu);
   document.getElementById('load-stats').addEventListener('click', async (ev)=>{ await withOverlay(ev.currentTarget, async ()=>{ await loadStats(); }); });
   document.getElementById('dds-apply-left').addEventListener('click', ()=>loadDds('left'));
   document.getElementById('dds-apply-right').addEventListener('click', ()=>loadDds('right'));
   document.getElementById('dds-export-left').addEventListener('click', ()=>exportDds('left'));
   document.getElementById('dds-export-right').addEventListener('click', ()=>exportDds('right'));
+
+  document.getElementById('stock-refresh-left').addEventListener('click', ()=>loadStock('left', true));
+  document.getElementById('stock-refresh-right').addEventListener('click', ()=>loadStock('right', true));
+  document.getElementById('stock-search-left').addEventListener('input', ()=>loadStock('left'));
+  document.getElementById('stock-search-right').addEventListener('input', ()=>loadStock('right'));
+  document.getElementById('stock-in-left').addEventListener('click', stockIncomingOpen);
+  document.getElementById('stock-in-right').addEventListener('click', stockIncomingOpen);
+  document.getElementById('stock-adjust-left').addEventListener('click', stockAdjustOpen);
+  document.getElementById('stock-adjust-right').addEventListener('click', stockAdjustOpen);
+  document.getElementById('stock-upd-left').addEventListener('click', ()=>alert('Формирование УПД будет добавлено позже'));
+  document.getElementById('stock-upd-right').addEventListener('click', ()=>alert('Формирование УПД будет добавлено позже'));
 
   document.getElementById('reload-orders-left').addEventListener('click', async (ev)=>{
     await withOverlay(ev.currentTarget, async ()=>{ ordersCache=[]; await loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); });
@@ -1515,6 +2022,31 @@ async function loadStatsLeft(){
   async function populateStatProducts(){ return; }
 
   document.addEventListener('DOMContentLoaded', async ()=>{ backToMenu(); backToMenuLeft(); });
+
+  document.addEventListener('click', (e)=>{
+    const move = e.target.closest('.stock-move');
+    if (move){ stockMovementsOpen(move.dataset.id); }
+  });
+
+  document.getElementById('stock-in-add-row')?.addEventListener('click', (e)=>{ e.preventDefault(); stockAddIncomingRow(); });
+  document.getElementById('stock-in-save')?.addEventListener('click', (e)=>{ e.preventDefault(); stockIncomingSave(); });
+  document.getElementById('stock-in-cancel')?.addEventListener('click', (e)=>{ e.preventDefault(); stockIncomingClose(); });
+  document.getElementById('stock-in-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockIncomingClose(); });
+  document.getElementById('stock-in-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-in-backdrop') stockIncomingClose(); });
+
+  document.getElementById('stock-doc-file')?.addEventListener('change', (e)=>{
+    const label = document.getElementById('stock-doc-file-label');
+    const file = e.target.files && e.target.files[0];
+    if (label) label.textContent = file ? file.name : 'Файл не выбран';
+  });
+
+  document.getElementById('stock-adjust-save')?.addEventListener('click', (e)=>{ e.preventDefault(); stockAdjustSave(); });
+  document.getElementById('stock-adjust-cancel')?.addEventListener('click', (e)=>{ e.preventDefault(); stockAdjustClose(); });
+  document.getElementById('stock-adjust-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockAdjustClose(); });
+  document.getElementById('stock-adjust-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-adjust-backdrop') stockAdjustClose(); });
+
+  document.getElementById('stock-movements-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockMovementsClose(); });
+  document.getElementById('stock-movements-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-movements-backdrop') stockMovementsClose(); });
 
   function skeletonRows(cols, count=6){
     const tr=[]; for(let i=0;i<count;i++){ const cells=Array.from({length:cols},()=>'<td><span class="muted">...</span></td>').join(''); tr.push('<tr>'+cells+'</tr>');} return tr.join('');
@@ -1728,6 +2260,14 @@ async function loadStatsLeft(){
           <label>Срок поставки</label>
           <input type="number" id="p_lead_time_days" min="0" step="1" value="0">
         </div>
+        <div class="adm-field">
+          <label>Тип поставки</label>
+          <select id="p_supply_mode">
+            <option value="stock">Склад</option>
+            <option value="mto">Под заказ</option>
+            <option value="mixed">Смешанный</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="adm-actions">
@@ -1774,6 +2314,7 @@ $('#admAddCancel').addEventListener('click', close);
       description: ($('#p_description').value || '').trim(),
       stock_qty: int($('#p_stock_qty').value, 0),
       lead_time_days: int($('#p_lead_time_days').value, 0),
+      supply_mode: ($('#p_supply_mode').value || 'stock'),
     };
 
     if (!payload.name) { alert('Введите название'); return; }
@@ -1874,6 +2415,16 @@ $('#admAddCancel').addEventListener('click', close);
         </div>
         <div class="adm-row">
           <div class="adm-field" style="flex:1">
+            <label>Тип поставки</label>
+            <select id="e_supply_mode">
+              <option value="stock">Склад</option>
+              <option value="mto">Под заказ</option>
+              <option value="mixed">Смешанный</option>
+            </select>
+          </div>
+        </div>
+        <div class="adm-row">
+          <div class="adm-field" style="flex:1">
             <label>Материал</label>
             <select id="e_material">
               <option>AISI 430</option>
@@ -1933,6 +2484,7 @@ $('#admAddCancel').addEventListener('click', close);
     byId('e_shelves').value = p?.shelves ?? 0;
     byId('e_stock_qty').value = p?.stock_qty ?? 0;
     byId('e_lead_time_days').value = p?.lead_time_days ?? 0;
+    byId('e_supply_mode').value = p?.supply_mode || 'stock';
     byId('e_material').value = p?.material || 'AISI 430';
     byId('e_construction').value = p?.construction || 'Сборно-разборная';
     byId('e_perforation').value = p?.perforation || 'Да';
@@ -1950,6 +2502,7 @@ $('#admAddCancel').addEventListener('click', close);
       shelves: parseInt(byId('e_shelves').value||'0',10) || 0,
       stock_qty: parseInt(byId('e_stock_qty').value||'0',10) || 0,
       lead_time_days: parseInt(byId('e_lead_time_days').value||'0',10) || 0,
+      supply_mode: byId('e_supply_mode').value || 'stock',
       material: byId('e_material').value,
       construction: byId('e_construction').value,
       perforation: byId('e_perforation').value,

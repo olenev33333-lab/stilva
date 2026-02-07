@@ -91,11 +91,24 @@ const imgHtml = p.image_url
           style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">`
   : `Фото изделия`;
 
+          const available = Math.max(0, Number(p.available_qty ?? p.stock_qty ?? 0));
+          const onOrder = Math.max(0, Number(p.on_order_qty ?? 0));
+          const mode = (p.supply_mode || 'stock');
+          let statusHtml = '';
+          if (mode === 'mixed') {
+            if (available > 0) statusHtml += `<span class="pill pill--stock">В наличии: ${available} шт.</span>`;
+            if (onOrder > 0) statusHtml += `<span class="pill pill--order">Под заказ: ${onOrder} шт.</span>`;
+            if (!statusHtml) statusHtml = `<span class="pill pill--order">Под заказ</span>`;
+          } else {
+            if (available > 0) statusHtml = `<span class="pill pill--stock">В наличии: ${available} шт.</span>`;
+            else statusHtml = `<span class="pill pill--order">Под заказ</span>`;
+          }
+
           return `
             <article class="product" data-id="${p.id}">
               <div class="product__body">
                 <div class="product__title">${title}</div>
-                <div class="product__status"><span class="pill pill--stock">В наличии: ${Number(p.stock_qty ?? 0)} шт.</span><span class="pill pill--lead">Срок поставки: ${p.lead_time_days ? ('до '+Number(p.lead_time_days)+' дн.') : 'уточняйте'}</span></div>
+                <div class="product__status">${statusHtml}</div>
                 <div class="product__price">${price.toLocaleString('ru-RU')}&nbsp;₽</div>
                 <div class="product__tags">
   ${[
@@ -436,5 +449,4 @@ return `
   if (document.readyState !== 'loading') requestAnimationFrame(step);
   else document.addEventListener('DOMContentLoaded', ()=>requestAnimationFrame(step));
 })();
-
 

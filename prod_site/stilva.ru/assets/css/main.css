@@ -373,6 +373,7 @@ section.contacts {
 .pill{font-size:12px;font-weight:600;padding:6px 10px;border-radius:12px;border:1px dashed #dbe3f2;background:#f8fafc;color:#0f172a}
 .pill--stock{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
 .pill--lead{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.pill--order{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
 /* === CONTACTS v2 (карточки + QR), без оверрайдов === */
 #contacts .contacts__grid{
   display: grid;
@@ -457,4 +458,3 @@ section.contacts {
   #contacts .qr-lines{ flex-wrap: wrap; } /* можно в 2 строки, если места мало */
   #contacts .qr-item img{ width: 140px; height: 140px; } /* побольше на мобилке */
 }
-
