@@ -760,7 +760,8 @@ function upd_build_xml_participant(SimpleXMLElement $node, array $p): void {
 }
 
 function upd_build_xml(array $doc): string {
-  $xml = new SimpleXMLElement('<?xml version="1.0" encoding="windows-1251"?><Файл></Файл>');
+  // Build in UTF-8 first to avoid SimpleXML parse errors, then convert to Windows-1251
+  $xml = new SimpleXMLElement('<?xml version="1.0" encoding="utf-8"?><Файл></Файл>');
   $xml->addAttribute('ИдФайл', (string)$doc['file_id']);
   $xml->addAttribute('ВерсФорм', '5.03');
   $xml->addAttribute('ВерсПрог', (string)($doc['program'] ?? 'Stilva'));
@@ -864,6 +865,7 @@ function upd_build_xml(array $doc): string {
 
   $out = $xml->asXML();
   if ($out === false) $out = '';
+  $out = str_replace('encoding="utf-8"', 'encoding="windows-1251"', $out);
   $converted = iconv('UTF-8', 'Windows-1251//TRANSLIT', $out);
   return $converted !== false ? $converted : $out;
 }
