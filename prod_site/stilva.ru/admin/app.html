@@ -832,6 +832,43 @@
   </div>
 </div>
 
+<!-- Модалка: ДДС по приходу -->
+<div class="modal-backdrop" id="stock-dds-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stock-dds-title" style="width:min(520px,96vw)">
+    <div class="modal-head">
+      <h3 id="stock-dds-title" class="card-title" style="margin:0">Расход в ДДС</h3>
+      <button class="close-x" id="stock-dds-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div class="adm-field">
+        <label>Дата</label>
+        <input type="date" id="stock-dds-date">
+      </div>
+      <div class="adm-field">
+        <label>Сумма, ₽</label>
+        <input type="number" id="stock-dds-amount" min="0" step="0.01" placeholder="0.00">
+      </div>
+      <div class="adm-field">
+        <label>Способ оплаты</label>
+        <select id="stock-dds-payment">
+          <option value="bank">Безнал</option>
+          <option value="transfer">Перевод</option>
+          <option value="card">Карта</option>
+          <option value="cash">Наличные</option>
+        </select>
+      </div>
+      <div class="adm-field">
+        <label>Комментарий (необязательно)</label>
+        <input type="text" id="stock-dds-comment" placeholder="Например: закупка по накладной">
+      </div>
+      <div class="adm-actions">
+        <button class="adm-btn adm-btn--ghost" id="stock-dds-cancel">Не вносить</button>
+        <button class="adm-btn adm-btn--accent" id="stock-dds-save">Внести в ДДС</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   /* API */
   window.api = async (path, opts = {}) => {
@@ -1451,6 +1488,7 @@ async function exportDds(side){
 const stockTypeLabels = { in:'Приход', out:'Списание', reserve:'Резерв', release:'Снятие резерва', adjust:'Корректировка' };
 const stockReasonLabels = { purchase:'Закупка', order:'Заказ', writeoff:'Списание', manual:'Вручную', production:'Производство' };
 const stockState = { list: [] };
+let stockIncomingSaving = false;
 
 function stockNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function stockFmt(v){ return stockNum(v).toLocaleString('ru-RU'); }
@@ -1603,6 +1641,8 @@ async function stockUploadFile(file){
 }
 
 async function stockIncomingSave(){
+  if (stockIncomingSaving) return;
+  stockIncomingSaving = true;
   const items = [];
   document.querySelectorAll('#stock-in-items .stock-row').forEach(row=>{
     const pid = parseInt(row.querySelector('.stock-in-product')?.value || '0', 10) || 0;
@@ -1611,7 +1651,7 @@ async function stockIncomingSave(){
     const price = priceRaw === '' ? null : parseFloat(priceRaw);
     if (pid > 0 && qty > 0) items.push({ product_id: pid, qty, price });
   });
-  if (!items.length){ alert('Добавьте хотя бы одну позицию'); return; }
+  if (!items.length){ alert('Добавьте хотя бы одну позицию'); stockIncomingSaving = false; return; }
 
   const doc = {
     doc_type: document.getElementById('stock-doc-type')?.value || 'other',
@@ -1625,8 +1665,21 @@ async function stockIncomingSave(){
   const fileInput = document.getElementById('stock-doc-file');
   if (fileInput && fileInput.files && fileInput.files[0]){
     const url = await stockUploadFile(fileInput.files[0]);
-    if (!url){ alert('Не удалось загрузить файл'); return; }
+    if (!url){ alert('Не удалось загрузить файл'); stockIncomingSaving = false; return; }
     doc.file_url = url;
+  }
+
+  const alreadyIn = confirm('Учтен ли данный приход в ДДС?');
+  let ddsData = null;
+  if (!alreadyIn){
+    const addToDds = confirm('Внести приход в ДДС как расход (категория \"Закупка\")?');
+    if (addToDds){
+      const sum = items.reduce((s,it)=> s + (Number(it.qty)||0) * (Number(it.price)||0), 0);
+      const defDate = doc.doc_date || new Date().toISOString().slice(0,10);
+      const defComment = ['Приход товара', doc.doc_number ? ('док. '+doc.doc_number) : '', doc.supplier || '']
+        .filter(Boolean).join(' / ');
+      ddsData = await stockDdsModalOpen({ amount: sum, date: defDate, payment_method: 'bank', comment: defComment });
+    }
   }
 
   try{
@@ -1635,11 +1688,31 @@ async function stockIncomingSave(){
       body: JSON.stringify({ doc, items })
     });
     if (!res.ok) throw new Error(await res.text());
+    if (ddsData){
+      const ddsRes = await api('/api/cashflow', {
+        method:'POST',
+        body: JSON.stringify({
+          date: ddsData.date,
+          type: 'expense',
+          amount: ddsData.amount,
+          category: 'Закупка',
+          payment_method: ddsData.payment_method,
+          comment: ddsData.comment || ''
+        })
+      });
+      if (!ddsRes.ok){
+        console.error(await ddsRes.text());
+        alert('Приход сохранен, но в ДДС не записано');
+      }
+    }
     stockIncomingClose();
     stockRefreshOpen();
+    ddsRefreshOpen();
   }catch(err){
     console.error(err);
     alert('Не удалось сохранить приход');
+  } finally {
+    stockIncomingSaving = false;
   }
 }
 
@@ -1721,6 +1794,29 @@ async function stockMovementsOpen(pid){
 function stockMovementsClose(){
   const back = document.getElementById('stock-movements-backdrop');
   if (back) back.style.display = 'none';
+}
+
+let stockDdsResolver = null;
+function stockDdsModalOpen(defaults){
+  const back = document.getElementById('stock-dds-backdrop');
+  if (!back) return Promise.resolve(null);
+  const dateEl = document.getElementById('stock-dds-date');
+  const amountEl = document.getElementById('stock-dds-amount');
+  const payEl = document.getElementById('stock-dds-payment');
+  const commentEl = document.getElementById('stock-dds-comment');
+
+  if (dateEl) dateEl.value = defaults?.date || new Date().toISOString().slice(0,10);
+  if (amountEl) amountEl.value = Number(defaults?.amount || 0) ? Number(defaults.amount).toFixed(2) : '';
+  if (payEl) payEl.value = defaults?.payment_method || 'bank';
+  if (commentEl) commentEl.value = defaults?.comment || '';
+
+  back.style.display = 'flex';
+  return new Promise(resolve => { stockDdsResolver = resolve; });
+}
+function stockDdsModalClose(result){
+  const back = document.getElementById('stock-dds-backdrop');
+  if (back) back.style.display = 'none';
+  if (stockDdsResolver){ stockDdsResolver(result || null); stockDdsResolver = null; }
 }
 
 /* ===== СТАТИСТИКА ===== */
@@ -2057,6 +2153,19 @@ async function loadStatsLeft(){
 
   document.getElementById('stock-movements-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockMovementsClose(); });
   document.getElementById('stock-movements-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-movements-backdrop') stockMovementsClose(); });
+
+  document.getElementById('stock-dds-save')?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    const date = document.getElementById('stock-dds-date')?.value || new Date().toISOString().slice(0,10);
+    const amount = parseFloat(document.getElementById('stock-dds-amount')?.value || '0') || 0;
+    const payment = document.getElementById('stock-dds-payment')?.value || 'bank';
+    const comment = (document.getElementById('stock-dds-comment')?.value || '').trim();
+    if (amount <= 0){ alert('Укажите сумму'); return; }
+    stockDdsModalClose({ date, amount, payment_method: payment, comment });
+  });
+  document.getElementById('stock-dds-cancel')?.addEventListener('click', (e)=>{ e.preventDefault(); stockDdsModalClose(null); });
+  document.getElementById('stock-dds-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockDdsModalClose(null); });
+  document.getElementById('stock-dds-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-dds-backdrop') stockDdsModalClose(null); });
 
   function skeletonRows(cols, count=6){
     const tr=[]; for(let i=0;i<count;i++){ const cells=Array.from({length:cols},()=>'<td><span class="muted">...</span></td>').join(''); tr.push('<tr>'+cells+'</tr>');} return tr.join('');
