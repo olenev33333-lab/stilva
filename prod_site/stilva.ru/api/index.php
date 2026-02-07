@@ -80,10 +80,18 @@ function cf_bootstrap(PDO $pdo){
     ('Прочее','expense',1)");
 }
 
+function cf_normalize_date(string $date): string {
+  $date = trim($date);
+  if ($date === '' || $date === '0000-00-00') return date('Y-m-d');
+  $dt = DateTime::createFromFormat('Y-m-d', $date);
+  if (!$dt || $dt->format('Y-m-d') !== $date) return date('Y-m-d');
+  return $date;
+}
+
 function cf_upsert_order_income(PDO $pdo, int $orderId, float $amount, string $paymentMethod, string $date){
   cf_bootstrap($pdo);
   $row = cf_find_order_income($pdo, $orderId);
-  $today = $date ?: date('Y-m-d');
+  $today = cf_normalize_date($date);
   if (!in_array($paymentMethod, ['cash','card','transfer','bank'], true)) $paymentMethod = 'bank';
   if ($row){
     $stmt = $pdo->prepare("UPDATE cashflow_entries SET amount = :amt, status = 'active', date = :d, payment_method = :pm, updated_at = NOW() WHERE id = :id");
