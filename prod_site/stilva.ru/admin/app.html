@@ -117,8 +117,15 @@
     background: #ef4444; color: #fff; text-decoration: none; font-weight: 700;
     line-height: 1; opacity: .95;
   }
+  .admin-header .settings-link{
+    position: absolute;
+    right: 108px; top: 50%; transform: translateY(-50%);
+    padding: 8px 12px; border-radius: 10px;
+    background: var(--btn); color: var(--btnText); text-decoration: none; font-weight: 700;
+    line-height: 1; cursor: pointer;
+  }
   .admin-header .logout-link:hover { opacity: 1; }
-  @media (max-width: 640px){ .admin-header .logout-link{ right:10px; padding:8px 10px } }
+  @media (max-width: 640px){ .admin-header .logout-link{ right:10px; padding:8px 10px } .admin-header .settings-link{ right:90px; padding:8px 10px } }
   /* === Stats: уменьшение типографики под размер «Заказов» === */
 #stats-pane, #stats-pane-left {           /* базовый текст блока */
   font-size: 14px;                        /* как в заказах */
@@ -244,7 +251,12 @@
 
 </head>
 <body>
-<header class="admin-header"><strong>Админ-панель</strong><div id="whoami" class="muted"></div><a href="?logout=1" class="logout-link">Выйти</a></header>
+<header class="admin-header">
+  <strong>Админ-панель</strong>
+  <div id="whoami" class="muted"></div>
+  <button id="open-settings" class="settings-link">Настройки</button>
+  <a href="?logout=1" class="logout-link">Выйти</a>
+</header>
 
 <div class="wrap">
   <div class="split">
@@ -621,6 +633,143 @@
     </div>
     <div class="scroll-area" style="max-height:72vh">
       <div style="padding:12px" id="order-modal-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: настройки -->
+<div class="modal-backdrop" id="settings-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" style="width:min(980px,96vw)">
+    <div class="modal-head">
+      <h3 id="settings-modal-title" class="card-title" style="margin:0">Настройки</h3>
+      <button class="close-x" id="settings-modal-close">✕</button>
+    </div>
+    <div class="scroll-area" style="max-height:72vh">
+      <div style="padding:12px">
+        <div class="order-section">
+          <div class="list-title">Настройки продавца</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field">
+                <label>Тип продавца</label>
+                <select id="set_seller_type">
+                  <option value="org">Организация</option>
+                  <option value="ip">ИП</option>
+                </select>
+              </div>
+              <div class="adm-field"><label>Наименование / ФИО</label><input type="text" id="set_seller_name"></div>
+              <div class="adm-field"><label>ИНН</label><input type="text" id="set_seller_inn"></div>
+              <div class="adm-field"><label>КПП</label><input type="text" id="set_seller_kpp"></div>
+              <div class="adm-field"><label>Адрес</label><input type="text" id="set_seller_address"></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Телефон</label><input type="text" id="set_seller_phone"></div>
+              <div class="adm-field"><label>Email</label><input type="text" id="set_seller_email"></div>
+              <div class="adm-field"><label>Банк</label><input type="text" id="set_bank_name"></div>
+              <div class="adm-field"><label>БИК</label><input type="text" id="set_bank_bik"></div>
+              <div class="adm-field"><label>Корсчет</label><input type="text" id="set_bank_corr"></div>
+              <div class="adm-field"><label>Расчетный счет</label><input type="text" id="set_bank_account"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-section">
+          <div class="list-title">УПД по умолчанию</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field">
+                <label>Ставка НДС</label>
+                <select id="set_vat_rate">
+                  <option value="без НДС">без НДС</option>
+                  <option value="0%">0%</option>
+                  <option value="5%">5%</option>
+                  <option value="7%">7%</option>
+                  <option value="10%">10%</option>
+                  <option value="20%">20%</option>
+                  <option value="5/105">5/105</option>
+                  <option value="7/107">7/107</option>
+                  <option value="10/110">10/110</option>
+                  <option value="20/120">20/120</option>
+                  <option value="НДС исчисляется налоговым агентом">НДС исчисляется налоговым агентом</option>
+                </select>
+              </div>
+              <div class="adm-field">
+                <label><input type="checkbox" id="set_vat_included"> Цена включает НДС</label>
+              </div>
+              <div class="adm-field"><label>Ед. изм. (код)</label><input type="text" id="set_unit_code" placeholder="796"></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Ед. изм. (название)</label><input type="text" id="set_unit_name" placeholder="шт"></div>
+              <div class="adm-field"><label>Содержание операции</label><input type="text" id="set_operation_content" placeholder="Отгрузка товаров"></div>
+              <div class="adm-field"><label>Основание документа</label><input type="text" id="set_basis_name" placeholder="Заказ"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-section">
+          <div class="list-title">ЭДО (для имени XML)</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label>Код оператора ЭДО</label><input type="text" id="set_edi_operator" placeholder="000"></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field">
+                <label>UID отправителя</label>
+                <div style="display:flex; gap:8px; align-items:center">
+                  <input type="text" id="set_edi_sender_uid" style="flex:1">
+                  <button class="ghost" id="set_edi_sender_gen" type="button">Новый GUID</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="muted">Если не используете ЭДО — оставьте код «000», GUID сформируется автоматически.</div>
+        </div>
+
+        <div class="adm-actions">
+          <button class="adm-btn adm-btn--accent" id="settings-save">Сохранить</button>
+          <button class="adm-btn adm-btn--ghost" id="settings-cancel">Закрыть</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: УПД -->
+<div class="modal-backdrop" id="upd-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="upd-modal-title" style="width:min(980px,96vw)">
+    <div class="modal-head">
+      <h3 id="upd-modal-title" class="card-title" style="margin:0">УПД (отгрузка)</h3>
+      <button class="close-x" id="upd-modal-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div class="order-section">
+        <div class="list-title">Выбор заказа</div>
+        <div class="adm-grid">
+          <div class="adm-col">
+            <div class="adm-field"><label>Номер заказа</label><input type="number" id="upd-order-id" min="1" step="1"></div>
+          </div>
+          <div class="adm-col" style="justify-content:flex-end">
+            <button class="ghost" id="upd-load-order">Загрузить</button>
+          </div>
+        </div>
+        <div id="upd-order-summary" class="muted" style="margin-top:8px">—</div>
+      </div>
+
+      <div id="upd-confirm-box" class="order-section" style="display:none">
+        <div class="list-title">Подтверждение</div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <span>Создать УПД по выбранному заказу?</span>
+          <button id="upd-confirm-yes">Да</button>
+          <button class="ghost" id="upd-confirm-no">Нет</button>
+        </div>
+      </div>
+
+      <div class="adm-actions">
+        <button class="adm-btn adm-btn--accent" id="upd-create">Создать УПД</button>
+        <button class="adm-btn adm-btn--ghost" id="upd-download-xml" disabled>Скачать XML</button>
+        <button class="adm-btn adm-btn--ghost" id="upd-print" disabled>Печать</button>
+        <button class="adm-btn adm-btn--ghost" id="upd-close">Закрыть</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1159,6 +1308,33 @@ function openOrderModal(order){
   const payDate = order.payment_date || '';
   const deliveryType = order.delivery_type || 'pickup';
   const deliveryAddress = order.delivery_address || '';
+  const updBuyerType = order.upd_buyer_type || 'org';
+  const updBuyerName = order.upd_buyer_name || order.customer_name || '';
+  const updBuyerInn = order.upd_buyer_inn || '';
+  const updBuyerKpp = order.upd_buyer_kpp || '';
+  const updBuyerAddr = order.upd_buyer_address || order.delivery_address || '';
+  const updBuyerOther = order.upd_buyer_other || '';
+  const updShipperSame = order.upd_shipper_same == null ? 1 : Number(order.upd_shipper_same);
+  const updShipperName = order.upd_shipper_name || '';
+  const updShipperInn = order.upd_shipper_inn || '';
+  const updShipperKpp = order.upd_shipper_kpp || '';
+  const updShipperAddr = order.upd_shipper_address || '';
+  const updConsSame = order.upd_consignee_same == null ? 1 : Number(order.upd_consignee_same);
+  const updConsName = order.upd_consignee_name || '';
+  const updConsAddr = order.upd_consignee_address || '';
+  const updDocDate = order.upd_doc_date || new Date().toISOString().slice(0,10);
+  const updVatRate = order.upd_vat_rate || 'без НДС';
+  const updVatIncluded = !!order.upd_vat_included;
+  const updSigner1Fio = order.upd_signer1_fio || '';
+  const updSigner1Pos = order.upd_signer1_pos || '';
+  const updSigner1Type = order.upd_signer1_type || '1';
+  const updSigner1Authority = order.upd_signer1_authority || '1';
+  const updSigner1Date = order.upd_signer1_date || updDocDate;
+  const updSigner2Fio = order.upd_signer2_fio || '';
+  const updSigner2Pos = order.upd_signer2_pos || '';
+  const updSigner2Type = order.upd_signer2_type || '1';
+  const updSigner2Authority = order.upd_signer2_authority || '1';
+  const updSigner2Date = order.upd_signer2_date || updDocDate;
   const checklist = {
     contacted: !!order.checklist_contacted,
     confirmed: !!order.checklist_confirmed,
@@ -1247,6 +1423,115 @@ function openOrderModal(order){
       </div>
     </div>
     <div class="order-section">
+      <div class="list-title">УПД (отгрузка)</div>
+      <div class="adm-grid">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label>Тип покупателя</label>
+            <select id="o_upd_buyer_type">
+              <option value="org" ${updBuyerType==='org'?'selected':''}>Организация</option>
+              <option value="ip" ${updBuyerType==='ip'?'selected':''}>ИП</option>
+              <option value="person" ${updBuyerType==='person'?'selected':''}>Физлицо</option>
+            </select>
+          </div>
+          <div class="adm-field"><label>Наименование / ФИО покупателя</label><input type="text" id="o_upd_buyer_name" value="${String(updBuyerName).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>ИНН покупателя</label><input type="text" id="o_upd_buyer_inn" value="${String(updBuyerInn).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>КПП покупателя</label><input type="text" id="o_upd_buyer_kpp" value="${String(updBuyerKpp).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>Адрес покупателя</label><input type="text" id="o_upd_buyer_address" value="${String(updBuyerAddr).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>Иные сведения (физлицо)</label><input type="text" id="o_upd_buyer_other" value="${String(updBuyerOther).replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field"><label>Дата УПД</label><input type="date" id="o_upd_doc_date" value="${String(updDocDate).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field">
+            <label>Ставка НДС</label>
+            <select id="o_upd_vat_rate">
+              <option value="без НДС" ${updVatRate==='без НДС'?'selected':''}>без НДС</option>
+              <option value="0%" ${updVatRate==='0%'?'selected':''}>0%</option>
+              <option value="5%" ${updVatRate==='5%'?'selected':''}>5%</option>
+              <option value="7%" ${updVatRate==='7%'?'selected':''}>7%</option>
+              <option value="10%" ${updVatRate==='10%'?'selected':''}>10%</option>
+              <option value="20%" ${updVatRate==='20%'?'selected':''}>20%</option>
+              <option value="5/105" ${updVatRate==='5/105'?'selected':''}>5/105</option>
+              <option value="7/107" ${updVatRate==='7/107'?'selected':''}>7/107</option>
+              <option value="10/110" ${updVatRate==='10/110'?'selected':''}>10/110</option>
+              <option value="20/120" ${updVatRate==='20/120'?'selected':''}>20/120</option>
+              <option value="НДС исчисляется налоговым агентом" ${updVatRate==='НДС исчисляется налоговым агентом'?'selected':''}>НДС исчисляется налоговым агентом</option>
+            </select>
+          </div>
+          <div class="adm-field">
+            <label><input type="checkbox" id="o_upd_vat_included" ${updVatIncluded?'checked':''}> Цена включает НДС</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="adm-grid" style="margin-top:8px">
+        <div class="adm-col">
+          <div class="adm-field">
+            <label><input type="checkbox" id="o_upd_shipper_same" ${updShipperSame ? 'checked':''}> Грузоотправитель = продавец</label>
+          </div>
+          <div class="adm-field"><label>Грузоотправитель (наименование)</label><input type="text" id="o_upd_shipper_name" value="${String(updShipperName).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>ИНН грузоотправителя</label><input type="text" id="o_upd_shipper_inn" value="${String(updShipperInn).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>КПП грузоотправителя</label><input type="text" id="o_upd_shipper_kpp" value="${String(updShipperKpp).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>Адрес грузоотправителя</label><input type="text" id="o_upd_shipper_address" value="${String(updShipperAddr).replace(/"/g,'&quot;')}"></div>
+        </div>
+        <div class="adm-col">
+          <div class="adm-field">
+            <label><input type="checkbox" id="o_upd_consignee_same" ${updConsSame ? 'checked':''}> Грузополучатель = покупатель</label>
+          </div>
+          <div class="adm-field"><label>Грузополучатель (наименование)</label><input type="text" id="o_upd_consignee_name" value="${String(updConsName).replace(/"/g,'&quot;')}"></div>
+          <div class="adm-field"><label>Адрес грузополучателя</label><input type="text" id="o_upd_consignee_address" value="${String(updConsAddr).replace(/"/g,'&quot;')}"></div>
+        </div>
+      </div>
+
+      <div class="order-section" style="margin-top:8px">
+        <div class="list-title">Подписанты (ЭП)</div>
+        <div class="adm-grid">
+          <div class="adm-col">
+            <div class="adm-field"><label>Подписант 1 (ФИО)</label><input type="text" id="o_upd_signer1_fio" value="${String(updSigner1Fio).replace(/"/g,'&quot;')}"></div>
+            <div class="adm-field"><label>Должность</label><input type="text" id="o_upd_signer1_pos" value="${String(updSigner1Pos).replace(/"/g,'&quot;')}"></div>
+            <div class="adm-field">
+              <label>Тип подписи</label>
+              <select id="o_upd_signer1_type">
+                <option value="1" ${updSigner1Type==='1'?'selected':''}>КЭП</option>
+                <option value="2" ${updSigner1Type==='2'?'selected':''}>Простая ЭП</option>
+                <option value="3" ${updSigner1Type==='3'?'selected':''}>НЭП</option>
+              </select>
+            </div>
+            <div class="adm-field">
+              <label>Подтверждение полномочий</label>
+              <select id="o_upd_signer1_authority">
+                <option value="1" ${updSigner1Authority==='1'?'selected':''}>По ЭП</option>
+                <option value="2" ${updSigner1Authority==='2'?'selected':''}>МЧД в пакете</option>
+                <option value="6" ${updSigner1Authority==='6'?'selected':''}>Иное</option>
+              </select>
+            </div>
+            <div class="adm-field"><label>Дата подписания</label><input type="date" id="o_upd_signer1_date" value="${String(updSigner1Date).replace(/"/g,'&quot;')}"></div>
+          </div>
+          <div class="adm-col">
+            <div class="adm-field"><label>Подписант 2 (ФИО)</label><input type="text" id="o_upd_signer2_fio" value="${String(updSigner2Fio).replace(/"/g,'&quot;')}"></div>
+            <div class="adm-field"><label>Должность</label><input type="text" id="o_upd_signer2_pos" value="${String(updSigner2Pos).replace(/"/g,'&quot;')}"></div>
+            <div class="adm-field">
+              <label>Тип подписи</label>
+              <select id="o_upd_signer2_type">
+                <option value="1" ${updSigner2Type==='1'?'selected':''}>КЭП</option>
+                <option value="2" ${updSigner2Type==='2'?'selected':''}>Простая ЭП</option>
+                <option value="3" ${updSigner2Type==='3'?'selected':''}>НЭП</option>
+              </select>
+            </div>
+            <div class="adm-field">
+              <label>Подтверждение полномочий</label>
+              <select id="o_upd_signer2_authority">
+                <option value="1" ${updSigner2Authority==='1'?'selected':''}>По ЭП</option>
+                <option value="2" ${updSigner2Authority==='2'?'selected':''}>МЧД в пакете</option>
+                <option value="6" ${updSigner2Authority==='6'?'selected':''}>Иное</option>
+              </select>
+            </div>
+            <div class="adm-field"><label>Дата подписания</label><input type="date" id="o_upd_signer2_date" value="${String(updSigner2Date).replace(/"/g,'&quot;')}"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="order-section">
       <div class="list-title">Чек-лист</div>
       <div class="order-checklist">
         <label><input type="checkbox" id="o_check_contacted" ${checklist.contacted?'checked':''}> Связались с клиентом</label>
@@ -1271,6 +1556,32 @@ function openOrderModal(order){
   }
   if (deliveryEl) deliveryEl.addEventListener('change', toggleAddress);
   toggleAddress();
+  const shipperSameEl = document.getElementById('o_upd_shipper_same');
+  const shipperFields = ['o_upd_shipper_name','o_upd_shipper_inn','o_upd_shipper_kpp','o_upd_shipper_address'];
+  const consigneeSameEl = document.getElementById('o_upd_consignee_same');
+  const consigneeFields = ['o_upd_consignee_name','o_upd_consignee_address'];
+  function toggleShipper(){
+    const on = shipperSameEl?.checked;
+    shipperFields.forEach(id=>{
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = !!on;
+      el.style.opacity = on ? '.6' : '1';
+    });
+  }
+  function toggleConsignee(){
+    const on = consigneeSameEl?.checked;
+    consigneeFields.forEach(id=>{
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.disabled = !!on;
+      el.style.opacity = on ? '.6' : '1';
+    });
+  }
+  shipperSameEl?.addEventListener('change', toggleShipper);
+  consigneeSameEl?.addEventListener('change', toggleConsignee);
+  toggleShipper();
+  toggleConsignee();
   document.getElementById('order-save')?.addEventListener('click', orderModalSave);
   orderModalBackdrop.style.display='flex';
 }
@@ -1291,7 +1602,34 @@ async function orderModalSave(){
     checklist_confirmed: document.getElementById('o_check_confirmed')?.checked ? 1 : 0,
     checklist_picked: document.getElementById('o_check_picked')?.checked ? 1 : 0,
     checklist_shipped: document.getElementById('o_check_shipped')?.checked ? 1 : 0,
-    checklist_docs: document.getElementById('o_check_docs')?.checked ? 1 : 0
+    checklist_docs: document.getElementById('o_check_docs')?.checked ? 1 : 0,
+    upd_buyer_type: document.getElementById('o_upd_buyer_type')?.value || 'org',
+    upd_buyer_name: (document.getElementById('o_upd_buyer_name')?.value || '').trim(),
+    upd_buyer_inn: (document.getElementById('o_upd_buyer_inn')?.value || '').trim(),
+    upd_buyer_kpp: (document.getElementById('o_upd_buyer_kpp')?.value || '').trim(),
+    upd_buyer_address: (document.getElementById('o_upd_buyer_address')?.value || '').trim(),
+    upd_buyer_other: (document.getElementById('o_upd_buyer_other')?.value || '').trim(),
+    upd_shipper_same: document.getElementById('o_upd_shipper_same')?.checked ? 1 : 0,
+    upd_shipper_name: (document.getElementById('o_upd_shipper_name')?.value || '').trim(),
+    upd_shipper_inn: (document.getElementById('o_upd_shipper_inn')?.value || '').trim(),
+    upd_shipper_kpp: (document.getElementById('o_upd_shipper_kpp')?.value || '').trim(),
+    upd_shipper_address: (document.getElementById('o_upd_shipper_address')?.value || '').trim(),
+    upd_consignee_same: document.getElementById('o_upd_consignee_same')?.checked ? 1 : 0,
+    upd_consignee_name: (document.getElementById('o_upd_consignee_name')?.value || '').trim(),
+    upd_consignee_address: (document.getElementById('o_upd_consignee_address')?.value || '').trim(),
+    upd_doc_date: document.getElementById('o_upd_doc_date')?.value || '',
+    upd_vat_rate: document.getElementById('o_upd_vat_rate')?.value || 'без НДС',
+    upd_vat_included: document.getElementById('o_upd_vat_included')?.checked ? 1 : 0,
+    upd_signer1_fio: (document.getElementById('o_upd_signer1_fio')?.value || '').trim(),
+    upd_signer1_pos: (document.getElementById('o_upd_signer1_pos')?.value || '').trim(),
+    upd_signer1_type: document.getElementById('o_upd_signer1_type')?.value || '1',
+    upd_signer1_authority: document.getElementById('o_upd_signer1_authority')?.value || '1',
+    upd_signer1_date: document.getElementById('o_upd_signer1_date')?.value || '',
+    upd_signer2_fio: (document.getElementById('o_upd_signer2_fio')?.value || '').trim(),
+    upd_signer2_pos: (document.getElementById('o_upd_signer2_pos')?.value || '').trim(),
+    upd_signer2_type: document.getElementById('o_upd_signer2_type')?.value || '1',
+    upd_signer2_authority: document.getElementById('o_upd_signer2_authority')?.value || '1',
+    upd_signer2_date: document.getElementById('o_upd_signer2_date')?.value || ''
   };
   try{
     const res = await api('/api/orders/'+id, { method:'PATCH', body: JSON.stringify(payload) });
@@ -2364,8 +2702,8 @@ async function loadStatsLeft(){
   document.getElementById('stock-in-right').addEventListener('click', stockIncomingOpen);
   document.getElementById('stock-adjust-left').addEventListener('click', stockAdjustOpen);
   document.getElementById('stock-adjust-right').addEventListener('click', stockAdjustOpen);
-  document.getElementById('stock-upd-left').addEventListener('click', ()=>alert('Формирование УПД будет добавлено позже'));
-  document.getElementById('stock-upd-right').addEventListener('click', ()=>alert('Формирование УПД будет добавлено позже'));
+  document.getElementById('stock-upd-left').addEventListener('click', ()=>updOpen());
+  document.getElementById('stock-upd-right').addEventListener('click', ()=>updOpen());
 
   document.getElementById('reload-orders-left').addEventListener('click', async (ev)=>{
     await withOverlay(ev.currentTarget, async ()=>{ ordersCache=[]; await loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); });
@@ -2426,6 +2764,186 @@ async function loadStatsLeft(){
   document.getElementById('stock-dds-confirm-secondary')?.addEventListener('click', (e)=>{ e.preventDefault(); stockConfirmClose(false); });
   document.getElementById('stock-dds-confirm-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockConfirmClose(null); });
   document.getElementById('stock-dds-confirm-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-dds-confirm-backdrop') stockConfirmClose(null); });
+
+  /* === Настройки === */
+  const settingsBackdrop = document.getElementById('settings-modal-backdrop');
+  const openSettingsBtn = document.getElementById('open-settings');
+  const settingsCloseBtn = document.getElementById('settings-modal-close');
+  const settingsCancelBtn = document.getElementById('settings-cancel');
+  const settingsSaveBtn = document.getElementById('settings-save');
+  const settingsGenUidBtn = document.getElementById('set_edi_sender_gen');
+
+  function uuidv4(){
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+      const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+    });
+  }
+
+  async function loadSettings(){
+    const res = await api('/api/settings');
+    const data = res.ok ? await res.json() : {};
+    const s = data.seller || {};
+    document.getElementById('set_seller_type').value = s.type || 'org';
+    document.getElementById('set_seller_name').value = s.name || s.fio || '';
+    document.getElementById('set_seller_inn').value = s.inn || '';
+    document.getElementById('set_seller_kpp').value = s.kpp || '';
+    document.getElementById('set_seller_address').value = s.address || '';
+    document.getElementById('set_seller_phone').value = s.phone || '';
+    document.getElementById('set_seller_email').value = s.email || '';
+    document.getElementById('set_bank_name').value = s.bank_name || '';
+    document.getElementById('set_bank_bik').value = s.bank_bik || '';
+    document.getElementById('set_bank_corr').value = s.bank_corr || '';
+    document.getElementById('set_bank_account').value = s.bank_account || '';
+    document.getElementById('set_vat_rate').value = s.vat_rate || 'без НДС';
+    document.getElementById('set_vat_included').checked = !!s.vat_included;
+    document.getElementById('set_unit_code').value = s.unit_code || '796';
+    document.getElementById('set_unit_name').value = s.unit_name || 'шт';
+    document.getElementById('set_operation_content').value = s.operation_content || 'Отгрузка товаров';
+    document.getElementById('set_basis_name').value = s.basis_name || 'Заказ';
+    document.getElementById('set_edi_operator').value = s.edi_operator || '000';
+    document.getElementById('set_edi_sender_uid').value = s.edi_sender_uid || '';
+  }
+
+  async function saveSettings(){
+    const type = document.getElementById('set_seller_type').value || 'org';
+    const name = (document.getElementById('set_seller_name').value || '').trim();
+    const payload = {
+      seller: {
+        type,
+        name,
+        fio: name,
+        inn: (document.getElementById('set_seller_inn').value || '').trim(),
+        kpp: (document.getElementById('set_seller_kpp').value || '').trim(),
+        address: (document.getElementById('set_seller_address').value || '').trim(),
+        phone: (document.getElementById('set_seller_phone').value || '').trim(),
+        email: (document.getElementById('set_seller_email').value || '').trim(),
+        bank_name: (document.getElementById('set_bank_name').value || '').trim(),
+        bank_bik: (document.getElementById('set_bank_bik').value || '').trim(),
+        bank_corr: (document.getElementById('set_bank_corr').value || '').trim(),
+        bank_account: (document.getElementById('set_bank_account').value || '').trim(),
+        vat_rate: document.getElementById('set_vat_rate').value || 'без НДС',
+        vat_included: document.getElementById('set_vat_included').checked ? 1 : 0,
+        unit_code: (document.getElementById('set_unit_code').value || '796').trim(),
+        unit_name: (document.getElementById('set_unit_name').value || 'шт').trim(),
+        operation_content: (document.getElementById('set_operation_content').value || '').trim(),
+        basis_name: (document.getElementById('set_basis_name').value || '').trim(),
+        edi_operator: (document.getElementById('set_edi_operator').value || '000').trim(),
+        edi_sender_uid: (document.getElementById('set_edi_sender_uid').value || '').trim()
+      }
+    };
+    const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });
+    if (!res.ok){
+      alert('Не удалось сохранить настройки');
+      return;
+    }
+    settingsClose();
+  }
+
+  function settingsOpen(){
+    settingsBackdrop.style.display='flex';
+    loadSettings();
+  }
+  function settingsClose(){
+    settingsBackdrop.style.display='none';
+  }
+  openSettingsBtn?.addEventListener('click', settingsOpen);
+  settingsCloseBtn?.addEventListener('click', settingsClose);
+  settingsCancelBtn?.addEventListener('click', settingsClose);
+  settingsBackdrop?.addEventListener('click', (e)=>{ if (e.target === settingsBackdrop) settingsClose(); });
+  settingsSaveBtn?.addEventListener('click', (e)=>{ e.preventDefault(); saveSettings(); });
+  settingsGenUidBtn?.addEventListener('click', (e)=>{ e.preventDefault(); document.getElementById('set_edi_sender_uid').value = uuidv4(); });
+
+  /* === УПД === */
+  const updBackdrop = document.getElementById('upd-modal-backdrop');
+  const updCloseBtn = document.getElementById('upd-modal-close');
+  const updCloseBtn2 = document.getElementById('upd-close');
+  const updLoadBtn = document.getElementById('upd-load-order');
+  const updCreateBtn = document.getElementById('upd-create');
+  const updDownloadBtn = document.getElementById('upd-download-xml');
+  const updPrintBtn = document.getElementById('upd-print');
+  const updConfirmBox = document.getElementById('upd-confirm-box');
+  const updConfirmYes = document.getElementById('upd-confirm-yes');
+  const updConfirmNo = document.getElementById('upd-confirm-no');
+
+  let updCurrentOrder = null;
+  let updDocId = null;
+
+  function updOpen(){
+    updBackdrop.style.display='flex';
+    updCurrentOrder = null; updDocId = null;
+    document.getElementById('upd-order-id').value = '';
+    document.getElementById('upd-order-summary').textContent = '—';
+    updDownloadBtn.disabled = true;
+    updPrintBtn.disabled = true;
+    updConfirmBox.style.display = 'none';
+  }
+  function updClose(){
+    updBackdrop.style.display='none';
+  }
+  function updSummary(order){
+    if (!order){ document.getElementById('upd-order-summary').textContent = '—'; return; }
+    const name = order.customer_name || 'Без имени';
+    const phone = order.phone || '—';
+    const total = order.total || 0;
+    document.getElementById('upd-order-summary').textContent = `Заказ #${order.id} • ${name} • ${phone} • ${total} ₽`;
+  }
+  async function updLoadOrder(){
+    const id = parseInt(document.getElementById('upd-order-id').value || '0', 10);
+    if (!id){ alert('Введите номер заказа'); return; }
+    const res = await api('/api/orders/'+id);
+    if (!res.ok){ alert('Заказ не найден'); return; }
+    updCurrentOrder = await res.json();
+    updSummary(updCurrentOrder);
+  }
+  function updAskConfirm(){
+    if (!updCurrentOrder){ alert('Сначала загрузите заказ'); return; }
+    updConfirmBox.style.display = 'block';
+  }
+  async function updCreateConfirmed(){
+    if (!updCurrentOrder) return;
+    const res = await api('/api/upd', { method:'POST', body: JSON.stringify({ order_id: updCurrentOrder.id }) });
+    if (!res.ok){
+      const err = await res.json().catch(()=>({}));
+      if (err && err.error === 'validation'){
+        const map = {
+          seller_name:'Продавец: наименование', seller_inn:'Продавец: ИНН', seller_fio:'Продавец: ФИО', seller_address:'Продавец: адрес',
+          buyer_name:'Покупатель: наименование', buyer_inn:'Покупатель: ИНН', buyer_address:'Покупатель: адрес', buyer_other:'Покупатель: иные сведения (для физлица)',
+          consignee_address:'Грузополучатель: адрес'
+        };
+        const fields = (err.fields || []).map(f=>map[f] || f).join(', ');
+        alert('Заполните обязательные поля: ' + fields);
+      } else if (err && err.error === 'no_signers'){
+        alert('Добавьте подписантов для УПД в карточке заказа.');
+      } else {
+        alert('Не удалось сформировать УПД');
+      }
+      return;
+    }
+    const doc = await res.json();
+    updDocId = doc.id;
+    updDownloadBtn.disabled = false;
+    updPrintBtn.disabled = false;
+    updConfirmBox.style.display = 'none';
+    document.getElementById('upd-order-summary').textContent = `УПД создан: ${doc.doc_number}`;
+  }
+  function updDownload(){
+    if (!updDocId) return;
+    window.location.href = `/api/upd/${updDocId}/xml`;
+  }
+  function updPrint(){
+    if (!updDocId) return;
+    window.open(`/api/upd/${updDocId}/print`, '_blank');
+  }
+
+  updBackdrop?.addEventListener('click', (e)=>{ if (e.target === updBackdrop) updClose(); });
+  updCloseBtn?.addEventListener('click', updClose);
+  updCloseBtn2?.addEventListener('click', updClose);
+  updLoadBtn?.addEventListener('click', (e)=>{ e.preventDefault(); updLoadOrder(); });
+  updCreateBtn?.addEventListener('click', (e)=>{ e.preventDefault(); updAskConfirm(); });
+  updConfirmYes?.addEventListener('click', (e)=>{ e.preventDefault(); updCreateConfirmed(); });
+  updConfirmNo?.addEventListener('click', (e)=>{ e.preventDefault(); updConfirmBox.style.display = 'none'; });
+  updDownloadBtn?.addEventListener('click', (e)=>{ e.preventDefault(); updDownload(); });
+  updPrintBtn?.addEventListener('click', (e)=>{ e.preventDefault(); updPrint(); });
 
   function skeletonRows(cols, count=6){
     const tr=[]; for(let i=0;i<count;i++){ const cells=Array.from({length:cols},()=>'<td><span class="muted">...</span></td>').join(''); tr.push('<tr>'+cells+'</tr>');} return tr.join('');

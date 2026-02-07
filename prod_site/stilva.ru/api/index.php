@@ -524,6 +524,34 @@ function order_bootstrap(PDO $pdo){
     'checklist_picked' => "TINYINT(1) NOT NULL DEFAULT 0",
     'checklist_shipped' => "TINYINT(1) NOT NULL DEFAULT 0",
     'checklist_docs' => "TINYINT(1) NOT NULL DEFAULT 0",
+    // UПД / отгрузочные данные
+    'upd_buyer_type' => "ENUM('org','ip','person') NOT NULL DEFAULT 'org'",
+    'upd_buyer_name' => "VARCHAR(255) NULL",
+    'upd_buyer_inn' => "VARCHAR(12) NULL",
+    'upd_buyer_kpp' => "VARCHAR(9) NULL",
+    'upd_buyer_address' => "VARCHAR(255) NULL",
+    'upd_buyer_other' => "VARCHAR(255) NULL",
+    'upd_shipper_same' => "TINYINT(1) NOT NULL DEFAULT 1",
+    'upd_shipper_name' => "VARCHAR(255) NULL",
+    'upd_shipper_inn' => "VARCHAR(12) NULL",
+    'upd_shipper_kpp' => "VARCHAR(9) NULL",
+    'upd_shipper_address' => "VARCHAR(255) NULL",
+    'upd_consignee_same' => "TINYINT(1) NOT NULL DEFAULT 1",
+    'upd_consignee_name' => "VARCHAR(255) NULL",
+    'upd_consignee_address' => "VARCHAR(255) NULL",
+    'upd_doc_date' => "DATE NULL",
+    'upd_vat_rate' => "VARCHAR(12) NULL",
+    'upd_vat_included' => "TINYINT(1) NOT NULL DEFAULT 0",
+    'upd_signer1_fio' => "VARCHAR(255) NULL",
+    'upd_signer1_pos' => "VARCHAR(255) NULL",
+    'upd_signer1_type' => "VARCHAR(1) NULL",
+    'upd_signer1_authority' => "VARCHAR(1) NULL",
+    'upd_signer1_date' => "DATE NULL",
+    'upd_signer2_fio' => "VARCHAR(255) NULL",
+    'upd_signer2_pos' => "VARCHAR(255) NULL",
+    'upd_signer2_type' => "VARCHAR(1) NULL",
+    'upd_signer2_authority' => "VARCHAR(1) NULL",
+    'upd_signer2_date' => "DATE NULL",
   ];
   foreach ($cols as $name=>$def){
     try{
@@ -535,6 +563,646 @@ function order_bootstrap(PDO $pdo){
     }
   }
 }
+
+function settings_bootstrap(PDO $pdo){
+  $pdo->exec("CREATE TABLE IF NOT EXISTS app_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    k VARCHAR(64) NOT NULL UNIQUE,
+    v MEDIUMTEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function settings_get_all(PDO $pdo): array {
+  settings_bootstrap($pdo);
+  $rows = $pdo->query("SELECT k, v FROM app_settings")->fetchAll();
+  $out = [];
+  foreach ($rows as $r){
+    $val = json_decode((string)$r['v'], true);
+    $out[$r['k']] = $val !== null ? $val : $r['v'];
+  }
+  return $out;
+}
+
+function settings_get(PDO $pdo, string $key, $default=null){
+  settings_bootstrap($pdo);
+  $stmt = $pdo->prepare("SELECT v FROM app_settings WHERE k = :k");
+  $stmt->execute([':k'=>$key]);
+  $row = $stmt->fetch();
+  if (!$row) return $default;
+  $val = json_decode((string)$row['v'], true);
+  return $val !== null ? $val : $row['v'];
+}
+
+function settings_set(PDO $pdo, string $key, $value): void {
+  settings_bootstrap($pdo);
+  $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  $stmt = $pdo->prepare("INSERT INTO app_settings (k, v) VALUES (:k, :v)
+    ON DUPLICATE KEY UPDATE v = VALUES(v), updated_at = NOW()");
+  $stmt->execute([':k'=>$key, ':v'=>$json]);
+}
+
+function uuid_v4(): string {
+  $data = random_bytes(16);
+  $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+  $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+  return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+function upd_bootstrap(PDO $pdo){
+  $pdo->exec("CREATE TABLE IF NOT EXISTS upd_docs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    doc_year INT NOT NULL,
+    doc_seq INT NOT NULL,
+    doc_number VARCHAR(32) NOT NULL,
+    doc_date DATE NOT NULL,
+    file_id VARCHAR(255) NULL,
+    file_name VARCHAR(255) NULL,
+    data_json MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_order (order_id),
+    KEY idx_year (doc_year)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function upd_next_seq(PDO $pdo, int $year): int {
+  $stmt = $pdo->prepare("SELECT MAX(doc_seq) AS m FROM upd_docs WHERE doc_year = :y");
+  $stmt->execute([':y'=>$year]);
+  $row = $stmt->fetch();
+  $m = $row && $row['m'] !== null ? (int)$row['m'] : 0;
+  return $m + 1;
+}
+
+function upd_doc_number(int $year, int $seq): string {
+  return $year.'-'.str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+}
+
+function upd_format_date(?string $ymd): string {
+  if (!$ymd) return date('d.m.Y');
+  $t = strtotime($ymd);
+  if (!$t) return date('d.m.Y');
+  return date('d.m.Y', $t);
+}
+
+function upd_format_time(?string $time=null): string {
+  if ($time){
+    $t = strtotime($time);
+    if ($t) return date('H.i.s', $t);
+  }
+  return date('H.i.s');
+}
+
+function upd_normalize_vat_rate(string $rate): string {
+  $allowed = ['0%','5%','7%','9,09%','10%','16,67%','20%','5/105','7/107','10/110','20/120','без НДС','НДС исчисляется налоговым агентом'];
+  return in_array($rate, $allowed, true) ? $rate : 'без НДС';
+}
+
+function upd_rate_to_float(string $rate): float {
+  $rate = str_replace('%','',$rate);
+  if ($rate === 'без НДС' || $rate === 'НДС исчисляется налоговым агентом') return 0.0;
+  if (strpos($rate, '/') !== false){
+    [$a,$b] = array_map('floatval', explode('/', $rate, 2));
+    if ($b > 0) return $a / $b;
+  }
+  $val = str_replace(',','.', $rate);
+  return is_numeric($val) ? ((float)$val / 100.0) : 0.0;
+}
+
+function upd_split_fio(string $fio): array {
+  $parts = array_values(array_filter(preg_split('/\\s+/', trim($fio))));
+  $last = $parts[0] ?? '';
+  $first = $parts[1] ?? '';
+  $middle = $parts[2] ?? '';
+  return [$last, $first, $middle];
+}
+
+function upd_calc_line(float $price, float $qty, string $rate, bool $included): array {
+  $rateNorm = upd_normalize_vat_rate($rate);
+  $k = upd_rate_to_float($rateNorm);
+  $sumRaw = $price * $qty;
+  if ($rateNorm === 'без НДС' || $rateNorm === 'НДС исчисляется налоговым агентом' || $k <= 0){
+    $noVat = $sumRaw;
+    $vat = 0.0;
+    $withVat = $sumRaw;
+    $priceNoVat = $qty > 0 ? ($noVat / $qty) : 0.0;
+  } elseif ($included){
+    $noVat = $sumRaw / (1 + $k);
+    $vat = $sumRaw - $noVat;
+    $withVat = $sumRaw;
+    $priceNoVat = $qty > 0 ? ($noVat / $qty) : 0.0;
+  } else {
+    $noVat = $sumRaw;
+    $vat = $noVat * $k;
+    $withVat = $noVat + $vat;
+    $priceNoVat = $price;
+  }
+  return [
+    'price_no_vat' => round($priceNoVat, 2),
+    'sum_no_vat' => round($noVat, 2),
+    'vat_sum' => round($vat, 2),
+    'sum_with_vat' => round($withVat, 2),
+    'vat_rate' => $rateNorm
+  ];
+}
+
+function upd_build_xml_participant(SimpleXMLElement $node, array $p): void {
+  $type = $p['type'] ?? 'org';
+  $id = $node->addChild('ИдСв');
+  if ($type === 'ip'){
+    $svip = $id->addChild('СвИП');
+    $fio = $svip->addChild('ФИО');
+    [$last,$first,$middle] = upd_split_fio((string)($p['fio'] ?? $p['name'] ?? ''));
+    if ($last !== '') $fio->addAttribute('Фамилия', $last);
+    if ($first !== '') $fio->addAttribute('Имя', $first);
+    if ($middle !== '') $fio->addAttribute('Отчество', $middle);
+    if (!empty($p['inn'])) $svip->addAttribute('ИННФЛ', (string)$p['inn']);
+  } elseif ($type === 'person'){
+    $svfl = $id->addChild('СвФЛУч');
+    $fio = $svfl->addChild('ФИО');
+    [$last,$first,$middle] = upd_split_fio((string)($p['fio'] ?? $p['name'] ?? ''));
+    if ($last !== '') $fio->addAttribute('Фамилия', $last);
+    if ($first !== '') $fio->addAttribute('Имя', $first);
+    if ($middle !== '') $fio->addAttribute('Отчество', $middle);
+    if (!empty($p['inn'])) $svfl->addAttribute('ИННФЛ', (string)$p['inn']);
+    if (!empty($p['other'])) $svfl->addAttribute('ИныеСвед', (string)$p['other']);
+  } else {
+    $svul = $id->addChild('СвЮЛУч');
+    if (!empty($p['name'])) $svul->addAttribute('НаимОрг', (string)$p['name']);
+    if (!empty($p['inn'])) $svul->addAttribute('ИННЮЛ', (string)$p['inn']);
+    if (!empty($p['kpp'])) $svul->addAttribute('КПП', (string)$p['kpp']);
+  }
+
+  $addrText = trim((string)($p['address'] ?? ''));
+  if ($addrText !== ''){
+    $addr = $node->addChild('Адрес');
+    $adr = $addr->addChild('АдрИнф');
+    $adr->addAttribute('КодСтр', '643');
+    $adr->addAttribute('НаимСтран', 'Российская Федерация');
+    $adr->addAttribute('АдрТекст', $addrText);
+  }
+
+  if (!empty($p['bank']) && is_array($p['bank'])){
+    $bank = $node->addChild('БанкРекв');
+    if (!empty($p['bank']['account'])) $bank->addAttribute('НомерСчета', (string)$p['bank']['account']);
+    $svb = $bank->addChild('СвБанк');
+    if (!empty($p['bank']['name'])) $svb->addAttribute('НаимБанк', (string)$p['bank']['name']);
+    if (!empty($p['bank']['bik'])) $svb->addAttribute('БИК', (string)$p['bank']['bik']);
+    if (!empty($p['bank']['corr'])) $svb->addAttribute('КорСчет', (string)$p['bank']['corr']);
+  }
+
+  if (!empty($p['phone']) || !empty($p['email'])){
+    $contact = $node->addChild('Контакт');
+    if (!empty($p['phone'])) $contact->addChild('Тлф', (string)$p['phone']);
+    if (!empty($p['email'])) $contact->addChild('ЭлПочта', (string)$p['email']);
+  }
+}
+
+function upd_build_xml(array $doc): string {
+  $xml = new SimpleXMLElement('<?xml version="1.0" encoding="windows-1251"?><Файл></Файл>');
+  $xml->addAttribute('ИдФайл', (string)$doc['file_id']);
+  $xml->addAttribute('ВерсФорм', '5.03');
+  $xml->addAttribute('ВерсПрог', (string)($doc['program'] ?? 'Stilva'));
+
+  $d = $xml->addChild('Документ');
+  $d->addAttribute('КНД', '1115131');
+  $d->addAttribute('Функция', 'СЧФДОП');
+  $d->addAttribute('ДатаИнфПр', (string)$doc['info_date']);
+  $d->addAttribute('ВремИнфПр', (string)$doc['info_time']);
+  $d->addAttribute('НаимДокОпр', (string)($doc['doc_title'] ?? 'УПД'));
+
+  $sv = $d->addChild('СвСчФакт');
+  $sv->addAttribute('НомерДок', (string)$doc['doc_number']);
+  $sv->addAttribute('ДатаДок', (string)$doc['doc_date_fmt']);
+
+  $svProd = $sv->addChild('СвПрод');
+  upd_build_xml_participant($svProd, $doc['seller'] ?? []);
+
+  if (!empty($doc['shipper_same'])){
+    $go = $sv->addChild('ГрузОт');
+    $go->addChild('ОнЖе', 'он же');
+  } else {
+    $go = $sv->addChild('ГрузОт');
+    $goP = $go->addChild('ГрузОтпр');
+    upd_build_xml_participant($goP, $doc['shipper'] ?? []);
+  }
+
+  $gp = $sv->addChild('ГрузПолуч');
+  upd_build_xml_participant($gp, $doc['consignee'] ?? []);
+
+  $svBuy = $sv->addChild('СвПокуп');
+  upd_build_xml_participant($svBuy, $doc['buyer'] ?? []);
+
+  $den = $sv->addChild('ДенИзм');
+  $den->addAttribute('КодОКВ', (string)($doc['currency_code'] ?? '643'));
+  $den->addAttribute('НаимОКВ', (string)($doc['currency_name'] ?? 'Российский рубль'));
+
+  $tab = $d->addChild('ТаблСчФакт');
+  $items = $doc['items'] ?? [];
+  $rowNum = 1;
+  foreach ($items as $it){
+    $row = $tab->addChild('СведТов');
+    $row->addAttribute('НомСтр', (string)$rowNum);
+    if (!empty($it['name'])) $row->addAttribute('НаимТов', (string)$it['name']);
+    if (!empty($it['unit_code'])) $row->addAttribute('ОКЕИ_Тов', (string)$it['unit_code']);
+    if (!empty($it['unit_name'])) $row->addAttribute('НаимЕдИзм', (string)$it['unit_name']);
+    if (isset($it['qty'])) $row->addAttribute('КолТов', number_format((float)$it['qty'], 3, '.', ''));
+    if (isset($it['price_no_vat'])) $row->addAttribute('ЦенаТов', number_format((float)$it['price_no_vat'], 2, '.', ''));
+    if (isset($it['sum_no_vat'])) $row->addAttribute('СтТовБезНДС', number_format((float)$it['sum_no_vat'], 2, '.', ''));
+    $row->addAttribute('НалСт', (string)($it['vat_rate'] ?? 'без НДС'));
+    if (isset($it['sum_with_vat'])) $row->addAttribute('СтТовУчНал', number_format((float)$it['sum_with_vat'], 2, '.', ''));
+
+    $sumVat = $row->addChild('СумНал');
+    $vatRate = (string)($it['vat_rate'] ?? 'без НДС');
+    $vatSum = (float)($it['vat_sum'] ?? 0);
+    if ($vatRate === 'без НДС' || $vatRate === 'НДС исчисляется налоговым агентом' || $vatSum <= 0){
+      $sumVat->addChild('БезНДС', 'без НДС');
+    } else {
+      $sumVat->addChild('СумНал', number_format($vatSum, 2, '.', ''));
+    }
+    $rowNum++;
+  }
+
+  $tot = $doc['totals'] ?? ['sum_no_vat'=>0,'sum_with_vat'=>0,'vat_sum'=>0,'vat_rate'=>'без НДС'];
+  $totEl = $tab->addChild('ВсегоОпл');
+  $totEl->addAttribute('СтТовБезНДСВсего', number_format((float)($tot['sum_no_vat'] ?? 0), 2, '.', ''));
+  $totEl->addAttribute('СтТовУчНалВсего', number_format((float)($tot['sum_with_vat'] ?? 0), 2, '.', ''));
+  $sumVatAll = $totEl->addChild('СумНалВсего');
+  $tRate = (string)($tot['vat_rate'] ?? 'без НДС');
+  $tVat = (float)($tot['vat_sum'] ?? 0);
+  if ($tRate === 'без НДС' || $tRate === 'НДС исчисляется налоговым агентом' || $tVat <= 0){
+    $sumVatAll->addChild('БезНДС', 'без НДС');
+  } else {
+    $sumVatAll->addChild('СумНал', number_format($tVat, 2, '.', ''));
+  }
+
+  $spp = $d->addChild('СвПродПер');
+  $svper = $spp->addChild('СвПер');
+  $svper->addAttribute('СодОпер', (string)($doc['operation_content'] ?? 'Отгрузка товаров'));
+  if (!empty($doc['operation_kind'])) $svper->addAttribute('ВидОпер', (string)$doc['operation_kind']);
+  if (!empty($doc['transfer_date_fmt'])) $svper->addAttribute('ДатаПер', (string)$doc['transfer_date_fmt']);
+
+  $osn = $svper->addChild('ОснПер');
+  $osn->addAttribute('РеквНаимДок', (string)($doc['basis_name'] ?? 'Заказ'));
+  $osn->addAttribute('РеквНомерДок', (string)($doc['basis_number'] ?? $doc['order_id'] ?? ''));
+  $osn->addAttribute('РеквДатаДок', (string)($doc['basis_date_fmt'] ?? $doc['doc_date_fmt']));
+
+  foreach (($doc['signers'] ?? []) as $s){
+    if (empty($s['fio'])) continue;
+    $p = $d->addChild('Подписант');
+    if (!empty($s['pos'])) $p->addAttribute('Должн', (string)$s['pos']);
+    if (!empty($s['sign_type'])) $p->addAttribute('ТипПодпис', (string)$s['sign_type']);
+    if (!empty($s['date_fmt'])) $p->addAttribute('ДатаПодДок', (string)$s['date_fmt']);
+    $p->addAttribute('СпосПодтПолном', (string)($s['authority'] ?? '1'));
+    $fio = $p->addChild('ФИО');
+    [$last,$first,$middle] = upd_split_fio((string)$s['fio']);
+    if ($last !== '') $fio->addAttribute('Фамилия', $last);
+    if ($first !== '') $fio->addAttribute('Имя', $first);
+    if ($middle !== '') $fio->addAttribute('Отчество', $middle);
+  }
+
+  $out = $xml->asXML();
+  if ($out === false) $out = '';
+  $converted = iconv('UTF-8', 'Windows-1251//TRANSLIT', $out);
+  return $converted !== false ? $converted : $out;
+}
+
+function upd_build_print_html(array $doc): string {
+  $h = fn($v)=>htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+  $seller = $doc['seller'] ?? [];
+  $buyer = $doc['buyer'] ?? [];
+  $shipper = $doc['shipper'] ?? $seller;
+  $consignee = $doc['consignee'] ?? $buyer;
+  $items = $doc['items'] ?? [];
+  $tot = $doc['totals'] ?? ['sum_no_vat'=>0,'vat_sum'=>0,'sum_with_vat'=>0,'vat_rate'=>'без НДС'];
+  $signers = $doc['signers'] ?? [];
+
+  $rows = '';
+  $i = 1;
+  foreach ($items as $it){
+    $rows .= '<tr>'
+      .'<td>'.$i.'</td>'
+      .'<td>'.$h($it['name'] ?? '').'</td>'
+      .'<td>'.$h($it['unit_name'] ?? '').'</td>'
+      .'<td class="num">'.number_format((float)($it['qty'] ?? 0), 3, '.', '').'</td>'
+      .'<td class="num">'.number_format((float)($it['price_no_vat'] ?? 0), 2, '.', '').'</td>'
+      .'<td class="num">'.number_format((float)($it['sum_no_vat'] ?? 0), 2, '.', '').'</td>'
+      .'<td>'.$h($it['vat_rate'] ?? 'без НДС').'</td>'
+      .'<td class="num">'.number_format((float)($it['vat_sum'] ?? 0), 2, '.', '').'</td>'
+      .'<td class="num">'.number_format((float)($it['sum_with_vat'] ?? 0), 2, '.', '').'</td>'
+      .'</tr>';
+    $i++;
+  }
+
+  $sellerName = $seller['type'] === 'ip' ? ($seller['fio'] ?? '') : ($seller['name'] ?? '');
+  $buyerName = $buyer['type'] === 'ip' ? ($buyer['fio'] ?? '') : ($buyer['name'] ?? '');
+
+  $signHtml = '';
+  foreach ($signers as $s){
+    $signHtml .= '<div class="sign-row"><div class="sign-role">'.$h($s['pos'] ?? 'Подписант').'</div><div class="sign-name">'.$h($s['fio'] ?? '').'</div></div>';
+  }
+  if ($signHtml === '') $signHtml = '<div class="sign-row"><div class="sign-role">Подписант</div><div class="sign-name">____________________</div></div>';
+
+  $html = '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>УПД</title><style>
+  body{font-family:Arial, sans-serif; color:#111; margin:20px;}
+  h1{font-size:20px; margin:0 0 8px;}
+  .muted{color:#666; font-size:12px;}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:10px 0;}
+  .box{border:1px solid #000; padding:8px; font-size:12px;}
+  table{width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;}
+  th,td{border:1px solid #000; padding:4px; vertical-align:top;}
+  th{background:#f3f3f3;}
+  td.num{text-align:right; white-space:nowrap;}
+  .signs{margin-top:16px;}
+  .sign-row{display:flex; justify-content:space-between; border-bottom:1px dashed #999; padding:6px 0; font-size:12px;}
+  .sign-role{font-weight:bold;}
+  @media print{body{margin:0} .no-print{display:none}}
+  </style></head><body>';
+
+  $html .= '<h1>Универсальный передаточный документ (УПД)</h1>';
+  $html .= '<div class="muted">Статус: 1 (счет‑фактура + передаточный документ)</div>';
+  $html .= '<div class="grid">';
+  $html .= '<div class="box"><div><b>Продавец:</b> '.$h($sellerName).'</div>'
+    .'<div><b>ИНН/КПП:</b> '.$h($seller['inn'] ?? '').' / '.$h($seller['kpp'] ?? '').'</div>'
+    .'<div><b>Адрес:</b> '.$h($seller['address'] ?? '').'</div>'
+    .'</div>';
+  $html .= '<div class="box"><div><b>Покупатель:</b> '.$h($buyerName).'</div>'
+    .'<div><b>ИНН/КПП:</b> '.$h($buyer['inn'] ?? '').' / '.$h($buyer['kpp'] ?? '').'</div>'
+    .'<div><b>Адрес:</b> '.$h($buyer['address'] ?? '').'</div>'
+    .'</div>';
+  $html .= '</div>';
+
+  $html .= '<div class="grid">';
+  $html .= '<div class="box"><div><b>Грузоотправитель:</b> '.$h($shipper['name'] ?? $sellerName).'</div>'
+    .'<div><b>Адрес:</b> '.$h($shipper['address'] ?? '').'</div></div>';
+  $html .= '<div class="box"><div><b>Грузополучатель:</b> '.$h($consignee['name'] ?? $buyerName).'</div>'
+    .'<div><b>Адрес:</b> '.$h($consignee['address'] ?? '').'</div></div>';
+  $html .= '</div>';
+
+  $html .= '<div class="box"><b>Документ:</b> № '.$h($doc['doc_number'] ?? '').' от '.$h($doc['doc_date_fmt'] ?? '').'</div>';
+
+  $html .= '<table><thead><tr>'
+    .'<th>№</th><th>Наименование</th><th>Ед.</th><th>Кол-во</th><th>Цена без НДС</th>'
+    .'<th>Сумма без НДС</th><th>НДС</th><th>Сумма НДС</th><th>Сумма с НДС</th>'
+    .'</tr></thead><tbody>'.$rows.'</tbody></table>';
+
+  $html .= '<div class="box" style="margin-top:10px">'
+    .'<div><b>Итого без НДС:</b> '.number_format((float)($tot['sum_no_vat'] ?? 0), 2, '.', '').'</div>'
+    .'<div><b>НДС:</b> '.number_format((float)($tot['vat_sum'] ?? 0), 2, '.', '').'</div>'
+    .'<div><b>Итого с НДС:</b> '.number_format((float)($tot['sum_with_vat'] ?? 0), 2, '.', '').'</div>'
+    .'</div>';
+
+  $html .= '<div class="signs">'.$signHtml.'</div>';
+  $html .= '</body></html>';
+  return $html;
+}
+
+function upd_build_doc(PDO $pdo, int $orderId, array $opts = []): array {
+  order_bootstrap($pdo);
+  upd_bootstrap($pdo);
+  settings_bootstrap($pdo);
+
+  $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = :id");
+  $stmt->execute([':id'=>$orderId]);
+  $order = $stmt->fetch();
+  if (!$order) return ['error'=>'order_nf'];
+
+  $it = $pdo->prepare("SELECT product_id, name, price, qty FROM order_items WHERE order_id = :id ORDER BY id ASC");
+  $it->execute([':id'=>$orderId]);
+  $items = $it->fetchAll();
+  if (!$items) return ['error'=>'no_items'];
+
+  $settings = settings_get($pdo, 'seller', []);
+  $sellerType = $settings['type'] ?? 'org';
+  $seller = [
+    'type' => $sellerType,
+    'name' => trim((string)($settings['name'] ?? '')),
+    'inn' => trim((string)($settings['inn'] ?? '')),
+    'kpp' => trim((string)($settings['kpp'] ?? '')),
+    'fio' => trim((string)($settings['fio'] ?? '')),
+    'address' => trim((string)($settings['address'] ?? '')),
+    'phone' => trim((string)($settings['phone'] ?? '')),
+    'email' => trim((string)($settings['email'] ?? '')),
+    'bank' => [
+      'name' => trim((string)($settings['bank_name'] ?? '')),
+      'bik' => trim((string)($settings['bank_bik'] ?? '')),
+      'corr' => trim((string)($settings['bank_corr'] ?? '')),
+      'account' => trim((string)($settings['bank_account'] ?? '')),
+    ],
+  ];
+
+  $errors = [];
+  if ($sellerType === 'org'){
+    if ($seller['name'] === '') $errors[] = 'seller_name';
+    if ($seller['inn'] === '') $errors[] = 'seller_inn';
+  } elseif ($sellerType === 'ip'){
+    if ($seller['fio'] === '') $errors[] = 'seller_fio';
+    if ($seller['inn'] === '') $errors[] = 'seller_inn';
+  }
+  if ($seller['address'] === '') $errors[] = 'seller_address';
+
+  $buyerType = $order['upd_buyer_type'] ?? 'org';
+  $buyerName = trim((string)($order['upd_buyer_name'] ?? $order['customer_name'] ?? ''));
+  $buyerInn = trim((string)($order['upd_buyer_inn'] ?? ''));
+  $buyerKpp = trim((string)($order['upd_buyer_kpp'] ?? ''));
+  $buyerAddr = trim((string)($order['upd_buyer_address'] ?? $order['delivery_address'] ?? ''));
+  $buyerOther = trim((string)($order['upd_buyer_other'] ?? ''));
+  $buyer = [
+    'type' => $buyerType,
+    'name' => $buyerName,
+    'inn' => $buyerInn,
+    'kpp' => $buyerKpp,
+    'fio' => $buyerName,
+    'address' => $buyerAddr,
+    'phone' => trim((string)($order['phone'] ?? '')),
+    'email' => trim((string)($order['email'] ?? '')),
+    'other' => $buyerOther,
+  ];
+  if ($buyerName === '') $errors[] = 'buyer_name';
+  if ($buyerAddr === '') $errors[] = 'buyer_address';
+  if (($buyerType === 'org' || $buyerType === 'ip') && $buyerInn === '') $errors[] = 'buyer_inn';
+  if ($buyerType === 'person' && $buyerInn === '' && $buyerOther === '') $errors[] = 'buyer_other';
+
+  $shipperSame = !isset($order['upd_shipper_same']) ? 1 : (int)$order['upd_shipper_same'];
+  $shipper = [
+    'type' => $sellerType,
+    'name' => trim((string)($order['upd_shipper_name'] ?? $seller['name'] ?? '')),
+    'inn' => trim((string)($order['upd_shipper_inn'] ?? $seller['inn'] ?? '')),
+    'kpp' => trim((string)($order['upd_shipper_kpp'] ?? $seller['kpp'] ?? '')),
+    'fio' => trim((string)($order['upd_shipper_name'] ?? $seller['fio'] ?? '')),
+    'address' => trim((string)($order['upd_shipper_address'] ?? $seller['address'] ?? '')),
+    'phone' => $seller['phone'],
+    'email' => $seller['email'],
+  ];
+
+  $consSame = !isset($order['upd_consignee_same']) ? 1 : (int)$order['upd_consignee_same'];
+  $consignee = [
+    'type' => $buyerType,
+    'name' => trim((string)($order['upd_consignee_name'] ?? $buyerName)),
+    'inn' => $buyerInn,
+    'kpp' => $buyerKpp,
+    'fio' => $buyerName,
+    'address' => trim((string)($order['upd_consignee_address'] ?? $buyerAddr)),
+    'phone' => $buyer['phone'],
+    'email' => $buyer['email'],
+    'other' => $buyerOther,
+  ];
+  if ($consignee['address'] === '') $errors[] = 'consignee_address';
+
+  if ($errors) return ['error'=>'validation', 'fields'=>$errors];
+
+  $vatRate = upd_normalize_vat_rate((string)($order['upd_vat_rate'] ?? $settings['vat_rate'] ?? 'без НДС'));
+  if (array_key_exists('upd_vat_included', $order)){
+    $vatIncluded = !empty($order['upd_vat_included']);
+  } else {
+    $vatIncluded = !empty($settings['vat_included']);
+  }
+
+  $unitCode = trim((string)($settings['unit_code'] ?? '796'));
+  $unitName = trim((string)($settings['unit_name'] ?? 'шт'));
+
+  $docDate = (string)($order['upd_doc_date'] ?? '');
+  if ($docDate === '') $docDate = date('Y-m-d');
+  $docYear = (int)date('Y', strtotime($docDate));
+
+  $existing = null;
+  $stmt = $pdo->prepare("SELECT * FROM upd_docs WHERE order_id = :oid");
+  $stmt->execute([':oid'=>$orderId]);
+  $existing = $stmt->fetch();
+
+  if ($existing){
+    $seq = (int)$existing['doc_seq'];
+    $docNum = (string)$existing['doc_number'];
+  } else {
+    $seq = upd_next_seq($pdo, $docYear);
+    $docNum = upd_doc_number($docYear, $seq);
+  }
+
+  $opCode = strtoupper(trim((string)($settings['edi_operator'] ?? '000')));
+  if ($opCode === '') $opCode = '000';
+  $senderUid = trim((string)($settings['edi_sender_uid'] ?? ''));
+  if ($senderUid === '') { $senderUid = uuid_v4(); $settings['edi_sender_uid'] = $senderUid; settings_set($pdo, 'seller', $settings); }
+  $receiverUid = '';
+  if ($existing){
+    $existingDoc = json_decode((string)$existing['data_json'], true);
+    if (is_array($existingDoc) && !empty($existingDoc['receiver_uid'])) $receiverUid = (string)$existingDoc['receiver_uid'];
+  }
+  if ($receiverUid === '') $receiverUid = uuid_v4();
+
+  $dateYmd = date('Ymd', strtotime($docDate));
+  $n1 = uuid_v4();
+  $fileId = "ON_NSCHFDOPPR_{$opCode}{$receiverUid}_{$opCode}{$senderUid}_{$dateYmd}_{$n1}_0_0_0_0_0_00";
+  $fileName = $fileId.'.xml';
+
+  $itemsOut = [];
+  $totNoVat = 0.0; $totVat = 0.0; $totWith = 0.0;
+  foreach ($items as $row){
+    $name = (string)($row['name'] ?? 'Товар');
+    $qty = (float)($row['qty'] ?? 0);
+    $price = (float)($row['price'] ?? 0);
+    $calc = upd_calc_line($price, $qty, $vatRate, (bool)$vatIncluded);
+    $itemsOut[] = [
+      'name' => $name,
+      'qty' => $qty,
+      'unit_code' => $unitCode,
+      'unit_name' => $unitName,
+      'price_no_vat' => $calc['price_no_vat'],
+      'sum_no_vat' => $calc['sum_no_vat'],
+      'vat_sum' => $calc['vat_sum'],
+      'sum_with_vat' => $calc['sum_with_vat'],
+      'vat_rate' => $calc['vat_rate'],
+    ];
+    $totNoVat += $calc['sum_no_vat'];
+    $totVat += $calc['vat_sum'];
+    $totWith += $calc['sum_with_vat'];
+  }
+
+  $signers = [];
+  $s1 = trim((string)($order['upd_signer1_fio'] ?? ''));
+  $s2 = trim((string)($order['upd_signer2_fio'] ?? ''));
+  if ($s1 !== ''){
+    $signers[] = [
+      'fio' => $s1,
+      'pos' => trim((string)($order['upd_signer1_pos'] ?? '')),
+      'sign_type' => trim((string)($order['upd_signer1_type'] ?? '1')),
+      'authority' => trim((string)($order['upd_signer1_authority'] ?? '1')),
+      'date_fmt' => upd_format_date((string)($order['upd_signer1_date'] ?? $docDate)),
+    ];
+  }
+  if ($s2 !== ''){
+    $signers[] = [
+      'fio' => $s2,
+      'pos' => trim((string)($order['upd_signer2_pos'] ?? '')),
+      'sign_type' => trim((string)($order['upd_signer2_type'] ?? '1')),
+      'authority' => trim((string)($order['upd_signer2_authority'] ?? '1')),
+      'date_fmt' => upd_format_date((string)($order['upd_signer2_date'] ?? $docDate)),
+    ];
+  }
+  if (!$signers) return ['error'=>'no_signers'];
+
+  $basisName = trim((string)($settings['basis_name'] ?? 'Заказ'));
+  $basisDate = $order['created_at'] ? date('Y-m-d', strtotime((string)$order['created_at'])) : $docDate;
+
+  $doc = [
+    'order_id' => $orderId,
+    'doc_number' => $docNum,
+    'doc_date' => $docDate,
+    'doc_date_fmt' => upd_format_date($docDate),
+    'info_date' => upd_format_date($docDate),
+    'info_time' => upd_format_time(null),
+    'doc_title' => 'УПД',
+    'file_id' => $fileId,
+    'file_name' => $fileName,
+    'receiver_uid' => $receiverUid,
+    'seller' => $seller,
+    'buyer' => $buyer,
+    'shipper' => $shipper,
+    'shipper_same' => $shipperSame ? 1 : 0,
+    'consignee' => $consignee,
+    'consignee_same' => $consSame ? 1 : 0,
+    'currency_code' => '643',
+    'currency_name' => 'Российский рубль',
+    'vat_rate' => $vatRate,
+    'vat_included' => $vatIncluded ? 1 : 0,
+    'items' => $itemsOut,
+    'totals' => [
+      'sum_no_vat' => round($totNoVat, 2),
+      'vat_sum' => round($totVat, 2),
+      'sum_with_vat' => round($totWith, 2),
+      'vat_rate' => $vatRate,
+    ],
+    'signers' => $signers,
+    'operation_content' => trim((string)($settings['operation_content'] ?? 'Отгрузка товаров')),
+    'basis_name' => $basisName === '' ? 'Заказ' : $basisName,
+    'basis_number' => (string)$orderId,
+    'basis_date' => $basisDate,
+    'basis_date_fmt' => upd_format_date($basisDate),
+    'transfer_date_fmt' => upd_format_date($docDate),
+  ];
+
+  $json = json_encode($doc, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  if ($existing){
+    $stmt = $pdo->prepare("UPDATE upd_docs SET doc_date = :d, file_id = :fid, file_name = :fn, data_json = :js WHERE order_id = :oid");
+    $stmt->execute([':d'=>$docDate, ':fid'=>$fileId, ':fn'=>$fileName, ':js'=>$json, ':oid'=>$orderId]);
+    $docId = (int)$existing['id'];
+  } else {
+    $stmt = $pdo->prepare("INSERT INTO upd_docs (order_id, doc_year, doc_seq, doc_number, doc_date, file_id, file_name, data_json)
+      VALUES (:oid,:y,:s,:n,:d,:fid,:fn,:js)");
+    $stmt->execute([
+      ':oid'=>$orderId, ':y'=>$docYear, ':s'=>$seq, ':n'=>$docNum, ':d'=>$docDate, ':fid'=>$fileId, ':fn'=>$fileName, ':js'=>$json
+    ]);
+    $docId = (int)$pdo->lastInsertId();
+  }
+
+  try {
+    $pdo->prepare("UPDATE orders SET checklist_docs = 1 WHERE id = :id")->execute([':id'=>$orderId]);
+  } catch (Throwable $e) {}
+
+  $doc['id'] = $docId;
+  return $doc;
+}
+
 
 function order_items_with_availability(PDO $pdo, int $orderId): array {
   stock_bootstrap($pdo);
@@ -785,7 +1453,18 @@ try {
         $stmt->execute([':id'=>$id]);
         $prev = $stmt->fetch();
         if (!$prev) out(404, ['error'=>'nf']);
-        $fields = ['note','cancel_reason','customer_name','phone','email','total','status','delivery_type','delivery_address','payment_status','payment_method','payment_amount','payment_date','checklist_contacted','checklist_confirmed','checklist_picked','checklist_shipped','checklist_docs'];
+        $fields = [
+          'note','cancel_reason','customer_name','phone','email','total','status','delivery_type','delivery_address',
+          'payment_status','payment_method','payment_amount','payment_date',
+          'checklist_contacted','checklist_confirmed','checklist_picked','checklist_shipped','checklist_docs',
+          // UПД
+          'upd_buyer_type','upd_buyer_name','upd_buyer_inn','upd_buyer_kpp','upd_buyer_address','upd_buyer_other',
+          'upd_shipper_same','upd_shipper_name','upd_shipper_inn','upd_shipper_kpp','upd_shipper_address',
+          'upd_consignee_same','upd_consignee_name','upd_consignee_address',
+          'upd_doc_date','upd_vat_rate','upd_vat_included',
+          'upd_signer1_fio','upd_signer1_pos','upd_signer1_type','upd_signer1_authority','upd_signer1_date',
+          'upd_signer2_fio','upd_signer2_pos','upd_signer2_type','upd_signer2_authority','upd_signer2_date'
+        ];
         $set = [];
         $args = [':id'=>$id];
         foreach($fields as $f){
@@ -793,7 +1472,7 @@ try {
             $set[] = "$f = :$f";
             if (in_array($f, ['total','payment_amount'], true)){
               $args[":$f"] = (float)$b[$f];
-            } elseif (in_array($f, ['checklist_contacted','checklist_confirmed','checklist_picked','checklist_shipped','checklist_docs'], true)){
+            } elseif (in_array($f, ['checklist_contacted','checklist_confirmed','checklist_picked','checklist_shipped','checklist_docs','upd_shipper_same','upd_consignee_same','upd_vat_included'], true)){
               $args[":$f"] = !empty($b[$f]) ? 1 : 0;
             } elseif ($f === 'payment_method'){
               $pm = (string)$b[$f];
@@ -807,6 +1486,12 @@ try {
               $dt = (string)$b[$f];
               if (!in_array($dt, ['pickup','delivery'], true)) $dt = 'pickup';
               $args[":$f"] = $dt;
+            } elseif ($f === 'upd_buyer_type'){
+              $bt = (string)$b[$f];
+              if (!in_array($bt, ['org','ip','person'], true)) $bt = 'org';
+              $args[":$f"] = $bt;
+            } elseif ($f === 'upd_vat_rate'){
+              $args[":$f"] = upd_normalize_vat_rate((string)$b[$f]);
             } else {
               $args[":$f"] = (string)$b[$f];
             }
@@ -856,6 +1541,81 @@ try {
       cf_sync_order($pdo, $id, (string)$prev['status'], (string)$st);
       stock_sync_order($pdo, $id, (string)$prev['status'], (string)$st);
       out(200, ['ok'=>true]);
+    }
+
+    out(404, ['error'=>'nf']);
+  }
+
+  if (($segments[0] ?? '') === 'settings'){
+    $pdo = db();
+    settings_bootstrap($pdo);
+    if ($method === 'GET'){
+      out(200, settings_get_all($pdo));
+    }
+    if ($method === 'POST' || $method === 'PATCH'){
+      $b = read_json();
+      if (!is_array($b)) out(400, ['error'=>'bad']);
+      foreach ($b as $k=>$v){
+        if (!is_string($k) || $k === '') continue;
+        settings_set($pdo, $k, $v);
+      }
+      out(200, ['ok'=>true]);
+    }
+    out(404, ['error'=>'nf']);
+  }
+
+  if (($segments[0] ?? '') === 'upd'){
+    $pdo = db();
+    upd_bootstrap($pdo);
+
+    if ($method === 'POST' && count($segments) === 1){
+      $b = read_json();
+      $orderId = isset($b['order_id']) ? (int)$b['order_id'] : 0;
+      if ($orderId <= 0) out(400, ['error'=>'order_required']);
+      $doc = upd_build_doc($pdo, $orderId, $b);
+      if (!empty($doc['error'])) out(400, $doc);
+      out(200, $doc);
+    }
+
+    if ($method === 'GET' && count($segments) === 2){
+      $id = (int)$segments[1];
+      $stmt = $pdo->prepare("SELECT * FROM upd_docs WHERE id = :id");
+      $stmt->execute([':id'=>$id]);
+      $row = $stmt->fetch();
+      if (!$row) out(404, ['error'=>'nf']);
+      $doc = json_decode((string)$row['data_json'], true);
+      if (!is_array($doc)) $doc = [];
+      $doc['id'] = (int)$row['id'];
+      out(200, $doc);
+    }
+
+    if ($method === 'GET' && count($segments) === 3 && $segments[2] === 'xml'){
+      $id = (int)$segments[1];
+      $stmt = $pdo->prepare("SELECT * FROM upd_docs WHERE id = :id");
+      $stmt->execute([':id'=>$id]);
+      $row = $stmt->fetch();
+      if (!$row) out(404, ['error'=>'nf']);
+      $doc = json_decode((string)$row['data_json'], true);
+      if (!is_array($doc)) out(500, ['error'=>'bad_doc']);
+      $xml = upd_build_xml($doc);
+      header('Content-Type: application/xml; charset=windows-1251');
+      $fname = $row['file_name'] ?: 'upd.xml';
+      header('Content-Disposition: attachment; filename="'.$fname.'"');
+      echo $xml;
+      exit;
+    }
+
+    if ($method === 'GET' && count($segments) === 3 && $segments[2] === 'print'){
+      $id = (int)$segments[1];
+      $stmt = $pdo->prepare("SELECT * FROM upd_docs WHERE id = :id");
+      $stmt->execute([':id'=>$id]);
+      $row = $stmt->fetch();
+      if (!$row) out(404, ['error'=>'nf']);
+      $doc = json_decode((string)$row['data_json'], true);
+      if (!is_array($doc)) out(500, ['error'=>'bad_doc']);
+      header('Content-Type: text/html; charset=utf-8');
+      echo upd_build_print_html($doc);
+      exit;
     }
 
     out(404, ['error'=>'nf']);
