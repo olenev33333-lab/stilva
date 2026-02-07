@@ -869,6 +869,23 @@
   </div>
 </div>
 
+<!-- Модалка: подтверждения ДДС -->
+<div class="modal-backdrop" id="stock-dds-confirm-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stock-dds-confirm-title" style="width:min(520px,96vw)">
+    <div class="modal-head">
+      <h3 id="stock-dds-confirm-title" class="card-title" style="margin:0">ДДС</h3>
+      <button class="close-x" id="stock-dds-confirm-close">✕</button>
+    </div>
+    <div style="padding:12px">
+      <div id="stock-dds-confirm-text" style="line-height:1.5"></div>
+      <div class="adm-actions">
+        <button class="adm-btn adm-btn--ghost" id="stock-dds-confirm-secondary">Нет</button>
+        <button class="adm-btn adm-btn--accent" id="stock-dds-confirm-primary">Да</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   /* API */
   window.api = async (path, opts = {}) => {
@@ -1669,11 +1686,21 @@ async function stockIncomingSave(){
     doc.file_url = url;
   }
 
-  const alreadyIn = confirm('Учтен ли данный приход в ДДС?');
+  const alreadyIn = await stockConfirmOpen({
+    title: 'ДДС',
+    text: 'Учтен ли данный приход в ДДС?',
+    primary: 'Да, учтен',
+    secondary: 'Нет, не учтен'
+  });
   let ddsData = null;
-  if (!alreadyIn){
-    const addToDds = confirm('Внести приход в ДДС как расход (категория \"Закупка\")?');
-    if (addToDds){
+  if (alreadyIn === false){
+    const addToDds = await stockConfirmOpen({
+      title: 'ДДС',
+      text: 'Внести приход в ДДС как расход (категория \"Закупка\")?',
+      primary: 'Да, внести',
+      secondary: 'Не нужно'
+    });
+    if (addToDds === true){
       const sum = items.reduce((s,it)=> s + (Number(it.qty)||0) * (Number(it.price)||0), 0);
       const defDate = doc.doc_date || new Date().toISOString().slice(0,10);
       const defComment = ['Приход товара', doc.doc_number ? ('док. '+doc.doc_number) : '', doc.supplier || '']
@@ -1817,6 +1844,27 @@ function stockDdsModalClose(result){
   const back = document.getElementById('stock-dds-backdrop');
   if (back) back.style.display = 'none';
   if (stockDdsResolver){ stockDdsResolver(result || null); stockDdsResolver = null; }
+}
+
+let stockConfirmResolver = null;
+function stockConfirmOpen(cfg){
+  const back = document.getElementById('stock-dds-confirm-backdrop');
+  if (!back) return Promise.resolve(null);
+  const title = document.getElementById('stock-dds-confirm-title');
+  const text = document.getElementById('stock-dds-confirm-text');
+  const primary = document.getElementById('stock-dds-confirm-primary');
+  const secondary = document.getElementById('stock-dds-confirm-secondary');
+  if (title) title.textContent = cfg?.title || 'ДДС';
+  if (text) text.textContent = cfg?.text || '';
+  if (primary) primary.textContent = cfg?.primary || 'Да';
+  if (secondary) secondary.textContent = cfg?.secondary || 'Нет';
+  back.style.display = 'flex';
+  return new Promise(resolve => { stockConfirmResolver = resolve; });
+}
+function stockConfirmClose(result){
+  const back = document.getElementById('stock-dds-confirm-backdrop');
+  if (back) back.style.display = 'none';
+  if (stockConfirmResolver){ stockConfirmResolver(result); stockConfirmResolver = null; }
 }
 
 /* ===== СТАТИСТИКА ===== */
@@ -2166,6 +2214,11 @@ async function loadStatsLeft(){
   document.getElementById('stock-dds-cancel')?.addEventListener('click', (e)=>{ e.preventDefault(); stockDdsModalClose(null); });
   document.getElementById('stock-dds-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockDdsModalClose(null); });
   document.getElementById('stock-dds-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-dds-backdrop') stockDdsModalClose(null); });
+
+  document.getElementById('stock-dds-confirm-primary')?.addEventListener('click', (e)=>{ e.preventDefault(); stockConfirmClose(true); });
+  document.getElementById('stock-dds-confirm-secondary')?.addEventListener('click', (e)=>{ e.preventDefault(); stockConfirmClose(false); });
+  document.getElementById('stock-dds-confirm-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockConfirmClose(null); });
+  document.getElementById('stock-dds-confirm-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-dds-confirm-backdrop') stockConfirmClose(null); });
 
   function skeletonRows(cols, count=6){
     const tr=[]; for(let i=0;i<count;i++){ const cells=Array.from({length:cols},()=>'<td><span class="muted">...</span></td>').join(''); tr.push('<tr>'+cells+'</tr>');} return tr.join('');
