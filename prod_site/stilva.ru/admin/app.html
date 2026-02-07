@@ -1320,8 +1320,8 @@ function openOrderModal(order){
   const updShipperKpp = order.upd_shipper_kpp || '';
   const updShipperAddr = order.upd_shipper_address || '';
   const updConsSame = order.upd_consignee_same == null ? 1 : Number(order.upd_consignee_same);
-  const updConsName = order.upd_consignee_name || '';
-  const updConsAddr = order.upd_consignee_address || '';
+  const updConsName = order.upd_consignee_name || updBuyerName || '';
+  const updConsAddr = order.upd_consignee_address || updBuyerAddr || '';
   const updDocDate = order.upd_doc_date || new Date().toISOString().slice(0,10);
   const updVatRate = order.upd_vat_rate || 'без НДС';
   const updVatIncluded = !!order.upd_vat_included;
@@ -1560,6 +1560,8 @@ function openOrderModal(order){
   const shipperFields = ['o_upd_shipper_name','o_upd_shipper_inn','o_upd_shipper_kpp','o_upd_shipper_address'];
   const consigneeSameEl = document.getElementById('o_upd_consignee_same');
   const consigneeFields = ['o_upd_consignee_name','o_upd_consignee_address'];
+  const buyerNameEl = document.getElementById('o_upd_buyer_name');
+  const buyerAddrEl = document.getElementById('o_upd_buyer_address');
   async function fillShipperFromSettings(force=false){
     const data = await getSettingsCache();
     const s = data && data.seller ? data.seller : {};
@@ -1595,9 +1597,24 @@ function openOrderModal(order){
       el.disabled = !!on;
       el.style.opacity = on ? '.6' : '1';
     });
+    if (on) fillConsigneeFromBuyer();
+  }
+  function fillConsigneeFromBuyer(force=false){
+    const name = (buyerNameEl?.value || '').trim();
+    const addr = (buyerAddrEl?.value || '').trim();
+    const map = { o_upd_consignee_name: name, o_upd_consignee_address: addr };
+    consigneeFields.forEach(id=>{
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (force || !el.value.trim()){
+        if (map[id]) el.value = map[id];
+      }
+    });
   }
   shipperSameEl?.addEventListener('change', toggleShipper);
   consigneeSameEl?.addEventListener('change', toggleConsignee);
+  buyerNameEl?.addEventListener('input', ()=>{ if (consigneeSameEl?.checked) fillConsigneeFromBuyer(true); });
+  buyerAddrEl?.addEventListener('input', ()=>{ if (consigneeSameEl?.checked) fillConsigneeFromBuyer(true); });
   toggleShipper();
   toggleConsignee();
   document.getElementById('order-save')?.addEventListener('click', orderModalSave);
