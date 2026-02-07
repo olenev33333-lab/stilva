@@ -199,7 +199,7 @@
 <style>
 /* ===== Stock UI ===== */
 .stock-toolbar{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-#stock-left-table, #stock-right-table{table-layout:fixed}
+#stock-left-table, #stock-right-table{table-layout:fixed;width:100%}
 #stock-left-table td.actions, #stock-right-table td.actions{overflow:hidden}
 .stock-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px}
 .stock-row{display:grid;grid-template-columns:1fr 120px 120px 40px;gap:8px;align-items:center}
@@ -209,6 +209,13 @@
 .stock-file-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stock-file-row input[type=\"file\"]{border:none;padding:0}
 .stock-mini{font-size:12px;color:var(--muted)}
+#stock-left-table th:nth-child(2), #stock-left-table td:nth-child(2),
+#stock-right-table th:nth-child(2), #stock-right-table td:nth-child(2){
+  white-space:normal;
+  word-break:break-word;
+  overflow:visible;
+  text-overflow:clip;
+}
 @media (max-width: 900px){
   .stock-row{grid-template-columns:1fr 90px 90px 36px}
 }
@@ -334,8 +341,8 @@
         <div id="stock-kpi-left" class="muted" style="padding:8px 8px 12px"></div>
         <table id="stock-left-table">
           <colgroup>
-            <col style="width:70px"><col style="width:360px"><col style="width:90px"><col style="width:90px">
-            <col style="width:100px"><col style="width:110px"><col style="width:140px">
+            <col style="width:8%"><col style="width:34%"><col style="width:11%"><col style="width:11%">
+            <col style="width:12%"><col style="width:12%"><col style="width:12%">
           </colgroup>
           <thead>
           <tr>
@@ -513,9 +520,9 @@
             <div class="pane-overlay"><div class="pane-spinner"></div></div>
             <div id="stock-kpi-right" class="muted" style="padding:8px 8px 12px"></div>
             <table id="stock-right-table">
-              <colgroup>
-                <col style="width:70px"><col style="width:360px"><col style="width:90px"><col style="width:90px">
-                <col style="width:100px"><col style="width:110px"><col style="width:140px">
+            <colgroup>
+                <col style="width:8%"><col style="width:34%"><col style="width:11%"><col style="width:11%">
+                <col style="width:12%"><col style="width:12%"><col style="width:12%">
               </colgroup>
               <thead>
               <tr>
@@ -2405,10 +2412,6 @@ $('#admAddCancel').addEventListener('click', close);
             <input type="number" id="e_shelves" min="0" step="1" value="0">
           </div>
           <div class="adm-field" style="flex:1">
-            <label>В наличии</label>
-            <input type="number" id="e_stock_qty" min="0" step="1" value="0">
-          </div>
-          <div class="adm-field" style="flex:1">
             <label>Срок поставки, дней</label>
             <input type="number" id="e_lead_time_days" min="0" step="1" value="0">
           </div>
@@ -2482,7 +2485,6 @@ $('#admAddCancel').addEventListener('click', close);
     byId('e_image_url').value = p?.image_url || '';
     byId('e_description').value = p?.description || '';
     byId('e_shelves').value = p?.shelves ?? 0;
-    byId('e_stock_qty').value = p?.stock_qty ?? 0;
     byId('e_lead_time_days').value = p?.lead_time_days ?? 0;
     byId('e_supply_mode').value = p?.supply_mode || 'stock';
     byId('e_material').value = p?.material || 'AISI 430';
@@ -2500,7 +2502,6 @@ $('#admAddCancel').addEventListener('click', close);
       image_url: (byId('e_image_url').value||'').trim(),
       description: (byId('e_description').value||'').trim(),
       shelves: parseInt(byId('e_shelves').value||'0',10) || 0,
-      stock_qty: parseInt(byId('e_stock_qty').value||'0',10) || 0,
       lead_time_days: parseInt(byId('e_lead_time_days').value||'0',10) || 0,
       supply_mode: byId('e_supply_mode').value || 'stock',
       material: byId('e_material').value,
