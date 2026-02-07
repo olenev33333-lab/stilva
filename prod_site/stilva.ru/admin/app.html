@@ -1560,6 +1560,23 @@ function openOrderModal(order){
   const shipperFields = ['o_upd_shipper_name','o_upd_shipper_inn','o_upd_shipper_kpp','o_upd_shipper_address'];
   const consigneeSameEl = document.getElementById('o_upd_consignee_same');
   const consigneeFields = ['o_upd_consignee_name','o_upd_consignee_address'];
+  async function fillShipperFromSettings(force=false){
+    const data = await getSettingsCache();
+    const s = data && data.seller ? data.seller : {};
+    const map = {
+      o_upd_shipper_name: (s.name || s.fio || '').trim(),
+      o_upd_shipper_inn: (s.inn || '').trim(),
+      o_upd_shipper_kpp: (s.kpp || '').trim(),
+      o_upd_shipper_address: (s.address || '').trim()
+    };
+    shipperFields.forEach(id=>{
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (force || !el.value.trim()){
+        if (map[id]) el.value = map[id];
+      }
+    });
+  }
   function toggleShipper(){
     const on = shipperSameEl?.checked;
     shipperFields.forEach(id=>{
@@ -1568,6 +1585,7 @@ function openOrderModal(order){
       el.disabled = !!on;
       el.style.opacity = on ? '.6' : '1';
     });
+    if (on) fillShipperFromSettings();
   }
   function toggleConsignee(){
     const on = consigneeSameEl?.checked;
@@ -2779,6 +2797,14 @@ async function loadStatsLeft(){
     });
   }
 
+  let settingsCache = null;
+  async function getSettingsCache(){
+    if (settingsCache) return settingsCache;
+    const res = await api('/api/settings');
+    settingsCache = res.ok ? await res.json() : {};
+    return settingsCache;
+  }
+
   async function loadSettings(){
     const res = await api('/api/settings');
     const data = res.ok ? await res.json() : {};
@@ -2836,6 +2862,7 @@ async function loadStatsLeft(){
       alert('Не удалось сохранить настройки');
       return;
     }
+    settingsCache = payload;
     settingsClose();
   }
 
