@@ -1040,8 +1040,44 @@ async function loadOrdersInto(tbodySel, paneId, statusFilterId, sortState){
     tbody.querySelectorAll('.status-select').forEach(sel=>{
       sel.addEventListener('change', async e=>{
         const id=e.target.dataset.id, newStatus=e.target.value;
-          await withOverlay(e.target, async ()=>{
-          await api('/api/orders/'+id+'/status',{method:'PATCH', body: JSON.stringify({status:newStatus})});
+        const prevOrder = ordersCache.find(x=>String(x.id)===String(id));
+        const prevStatus = prevOrder ? (prevOrder.status || '') : '';
+        await withOverlay(e.target, async ()=>{
+          if (newStatus === 'Выполнен'){
+            try{
+              const resCheck = await api('/api/orders/'+id);
+              const full = resCheck.ok ? await resCheck.json() : null;
+              const payAmount = full && full.payment_amount != null ? parseFloat(full.payment_amount) : 0;
+              const payMethod = full && full.payment_method ? String(full.payment_method) : '';
+              const okMethod = ['cash','card','transfer','bank'].includes(payMethod);
+              if (!okMethod || !(payAmount > 0)){
+                alert('Перед установкой статуса \"Выполнен\" заполните сумму оплаты и способ оплаты в карточке заказа.');
+                e.target.value = prevStatus || '';
+                applyRowStatusClass(e.target.closest('tr'), prevStatus || '');
+                openOrderById(id);
+                return;
+              }
+            }catch(_){
+              // если не удалось проверить — не ставим статус
+              alert('Не удалось проверить оплату. Откройте карточку заказа и заполните оплату.');
+              e.target.value = prevStatus || '';
+              applyRowStatusClass(e.target.closest('tr'), prevStatus || '');
+              return;
+            }
+          }
+          const resp = await api('/api/orders/'+id+'/status',{method:'PATCH', body: JSON.stringify({status:newStatus})});
+          if (!resp.ok){
+            const text = await resp.text();
+            if (text && text.includes('payment_required')){
+              alert('Перед установкой статуса \"Выполнен\" заполните сумму оплаты и способ оплаты в карточке заказа.');
+              openOrderById(id);
+            } else {
+              alert('Не удалось изменить статус');
+            }
+            e.target.value = prevStatus || '';
+            applyRowStatusClass(e.target.closest('tr'), prevStatus || '');
+            return;
+          }
           const idx=ordersCache.findIndex(x=>String(x.id)===String(id)); if(idx>-1) ordersCache[idx].status=newStatus; applyRowStatusClass(e.target.closest('tr'), newStatus);
           ddsRefreshOpen();
           stockRefreshOpen();

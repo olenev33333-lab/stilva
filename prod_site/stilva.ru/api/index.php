@@ -773,7 +773,7 @@ try {
 
       if ($method === 'PATCH'){
         $b = read_json();
-        $stmt = $pdo->prepare("SELECT id, total, status FROM orders WHERE id = :id");
+        $stmt = $pdo->prepare("SELECT id, total, status, payment_amount, payment_method FROM orders WHERE id = :id");
         $stmt->execute([':id'=>$id]);
         $prev = $stmt->fetch();
         if (!$prev) out(404, ['error'=>'nf']);
@@ -805,10 +805,16 @@ try {
           }
         }
         if (!$set) out(400, ['error'=>'no_fields']);
+        $newStatus = array_key_exists('status', $b) ? (string)$b['status'] : (string)$prev['status'];
+        if ($newStatus === 'Выполнен'){
+          $newPayAmount = array_key_exists('payment_amount', $b) ? (float)$b['payment_amount'] : (float)($prev['payment_amount'] ?? 0);
+          $newPayMethod = array_key_exists('payment_method', $b) ? (string)$b['payment_method'] : (string)($prev['payment_method'] ?? '');
+          if (!in_array($newPayMethod, ['cash','card','transfer','bank'], true)) $newPayMethod = '';
+          if ($newPayAmount <= 0 || $newPayMethod === '') out(400, ['error'=>'payment_required']);
+        }
         $sql = "UPDATE orders SET ".implode(',', $set)." WHERE id = :id";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($args);
-        $newStatus = array_key_exists('status', $b) ? (string)$b['status'] : (string)$prev['status'];
         cf_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         stock_sync_order($pdo, $id, (string)$prev['status'], $newStatus);
         out(200, ['ok'=>true]);
@@ -827,10 +833,16 @@ try {
       $b = read_json();
       $st = $b['status'] ?? null;
       if (!$st) out(400, ['error'=>'no_status']);
-      $stmt = $pdo->prepare("SELECT id, total, status FROM orders WHERE id = :id");
+      $stmt = $pdo->prepare("SELECT id, total, status, payment_amount, payment_method FROM orders WHERE id = :id");
       $stmt->execute([':id'=>$id]);
       $prev = $stmt->fetch();
       if (!$prev) out(404, ['error'=>'nf']);
+      if ($st === 'Выполнен'){
+        $payAmount = (float)($prev['payment_amount'] ?? 0);
+        $payMethod = (string)($prev['payment_method'] ?? '');
+        if (!in_array($payMethod, ['cash','card','transfer','bank'], true)) $payMethod = '';
+        if ($payAmount <= 0 || $payMethod === '') out(400, ['error'=>'payment_required']);
+      }
       $stmt = $pdo->prepare("UPDATE orders SET status = :s WHERE id = :id");
       $stmt->execute([':s'=>$st, ':id'=>$id]);
       cf_sync_order($pdo, $id, (string)$prev['status'], (string)$st);
