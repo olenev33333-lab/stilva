@@ -122,6 +122,300 @@ function cf_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newSt
   }
 }
 
+function stock_column_missing(PDO $pdo, string $table, string $column): bool {
+  $stmt = $pdo->prepare("SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c");
+  $stmt->execute([':t'=>$table, ':c'=>$column]);
+  $row = $stmt->fetch();
+  return empty($row) || (int)$row['c'] === 0;
+}
+
+function stock_bootstrap(PDO $pdo){
+  $pdo->exec("CREATE TABLE IF NOT EXISTS stock_movements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    qty INT NOT NULL DEFAULT 0,
+    type ENUM('in','out','reserve','release','adjust') NOT NULL,
+    reason ENUM('purchase','order','writeoff','manual','production') NOT NULL DEFAULT 'manual',
+    order_id INT NULL,
+    doc_id INT NULL,
+    comment TEXT,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_product (product_id),
+    KEY idx_type (type),
+    KEY idx_order (order_id),
+    KEY idx_doc (doc_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS stock_docs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    doc_type ENUM('invoice','act','receipt','other') NOT NULL DEFAULT 'other',
+    doc_number VARCHAR(64) NULL,
+    doc_date DATE NULL,
+    supplier VARCHAR(255) NULL,
+    file_url VARCHAR(512) NULL,
+    comment TEXT,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS stock_doc_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    doc_id INT NOT NULL,
+    product_id INT NOT NULL,
+    qty INT NOT NULL DEFAULT 0,
+    price DECIMAL(10,2) NULL,
+    KEY idx_doc (doc_id),
+    KEY idx_product (product_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS production_orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    order_id INT NULL,
+    qty INT NOT NULL DEFAULT 0,
+    qty_done INT NOT NULL DEFAULT 0,
+    status ENUM('open','closed','cancelled') NOT NULL DEFAULT 'open',
+    comment TEXT,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_product (product_id),
+    KEY idx_order (order_id),
+    KEY idx_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  try {
+    if (stock_column_missing($pdo, 'products', 'supply_mode')){
+      $pdo->exec("ALTER TABLE products ADD COLUMN supply_mode ENUM('stock','mto','mixed') NOT NULL DEFAULT 'stock'");
+    }
+  } catch (Throwable $e) {
+    // ignore if column already exists or no permission
+  }
+}
+
+function stock_reserved_map(PDO $pdo, array $productIds = []): array {
+  if ($productIds){
+    $in = implode(',', array_map('intval', $productIds));
+    $sql = "SELECT product_id, SUM(CASE WHEN type='reserve' THEN qty WHEN type='release' THEN -qty ELSE 0 END) AS reserved
+            FROM stock_movements WHERE product_id IN ($in) GROUP BY product_id";
+  } else {
+    $sql = "SELECT product_id, SUM(CASE WHEN type='reserve' THEN qty WHEN type='release' THEN -qty ELSE 0 END) AS reserved
+            FROM stock_movements GROUP BY product_id";
+  }
+  $rows = $pdo->query($sql)->fetchAll();
+  $map = [];
+  foreach ($rows as $r){ $map[(int)$r['product_id']] = (int)$r['reserved']; }
+  return $map;
+}
+
+function stock_on_order_map(PDO $pdo, array $productIds = []): array {
+  if ($productIds){
+    $in = implode(',', array_map('intval', $productIds));
+    $sql = "SELECT product_id, SUM(qty - qty_done) AS on_order
+            FROM production_orders WHERE status='open' AND product_id IN ($in) GROUP BY product_id";
+  } else {
+    $sql = "SELECT product_id, SUM(qty - qty_done) AS on_order FROM production_orders WHERE status='open' GROUP BY product_id";
+  }
+  $rows = $pdo->query($sql)->fetchAll();
+  $map = [];
+  foreach ($rows as $r){ $map[(int)$r['product_id']] = (int)$r['on_order']; }
+  return $map;
+}
+
+function stock_reserved_by_order(PDO $pdo, int $orderId): array {
+  $stmt = $pdo->prepare("SELECT product_id, SUM(CASE WHEN type='reserve' THEN qty WHEN type='release' THEN -qty ELSE 0 END) AS reserved
+                         FROM stock_movements WHERE order_id = :oid GROUP BY product_id");
+  $stmt->execute([':oid'=>$orderId]);
+  $rows = $stmt->fetchAll();
+  $map = [];
+  foreach ($rows as $r){ $map[(int)$r['product_id']] = (int)$r['reserved']; }
+  return $map;
+}
+
+function stock_production_by_order(PDO $pdo, int $orderId): array {
+  $stmt = $pdo->prepare("SELECT * FROM production_orders WHERE order_id = :oid AND status='open'");
+  $stmt->execute([':oid'=>$orderId]);
+  $rows = $stmt->fetchAll();
+  $map = [];
+  foreach ($rows as $r){ $map[(int)$r['product_id']] = $r; }
+  return $map;
+}
+
+function stock_insert_movement(PDO $pdo, array $row){
+  $stmt = $pdo->prepare("INSERT INTO stock_movements (product_id, qty, type, reason, order_id, doc_id, comment, created_by)
+    VALUES (:pid,:qty,:type,:reason,:oid,:did,:cmt,:cb)");
+  $stmt->execute([
+    ':pid'=>(int)($row['product_id'] ?? 0),
+    ':qty'=>(int)($row['qty'] ?? 0),
+    ':type'=>(string)($row['type'] ?? 'adjust'),
+    ':reason'=>(string)($row['reason'] ?? 'manual'),
+    ':oid'=>($row['order_id'] ?? null),
+    ':did'=>($row['doc_id'] ?? null),
+    ':cmt'=>(string)($row['comment'] ?? ''),
+    ':cb'=>(string)($row['created_by'] ?? 'admin'),
+  ]);
+}
+
+function stock_apply_production_on_incoming(PDO $pdo, int $productId, int $qty){
+  if ($qty <= 0) return;
+  $stmt = $pdo->prepare("SELECT id, qty, qty_done FROM production_orders WHERE product_id = :pid AND status='open' ORDER BY id ASC");
+  $stmt->execute([':pid'=>$productId]);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as $r){
+    $need = (int)$r['qty'] - (int)$r['qty_done'];
+    if ($need <= 0) continue;
+    $take = min($need, $qty);
+    $newDone = (int)$r['qty_done'] + $take;
+    $newStatus = ($newDone >= (int)$r['qty']) ? 'closed' : 'open';
+    $upd = $pdo->prepare("UPDATE production_orders SET qty_done = :qd, status = :st WHERE id = :id");
+    $upd->execute([':qd'=>$newDone, ':st'=>$newStatus, ':id'=>$r['id']]);
+    $qty -= $take;
+    if ($qty <= 0) break;
+  }
+}
+
+function stock_apply_reservation(PDO $pdo, int $orderId){
+  stock_bootstrap($pdo);
+  $orderStmt = $pdo->prepare("SELECT id FROM orders WHERE id = :id");
+  $orderStmt->execute([':id'=>$orderId]);
+  if (!$orderStmt->fetch()) return;
+
+  $itemsStmt = $pdo->prepare("SELECT product_id, qty FROM order_items WHERE order_id = :id");
+  $itemsStmt->execute([':id'=>$orderId]);
+  $items = $itemsStmt->fetchAll();
+  if (!$items) return;
+
+  $productIds = array_values(array_unique(array_map(fn($x)=>(int)$x['product_id'], $items)));
+  $in = implode(',', array_map('intval', $productIds));
+  $products = $pdo->query("SELECT id, stock_qty, supply_mode FROM products WHERE id IN ($in)")->fetchAll();
+  $productMap = [];
+  foreach ($products as $p){ $productMap[(int)$p['id']] = $p; }
+
+  $reservedTotal = stock_reserved_map($pdo, $productIds);
+  $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
+  $prodByOrder = stock_production_by_order($pdo, $orderId);
+
+  foreach ($items as $it){
+    $pid = (int)$it['product_id'];
+    $orderQty = (int)$it['qty'];
+    $p = $productMap[$pid] ?? null;
+    if (!$p) continue;
+    $mode = $p['supply_mode'] ?: 'stock';
+
+    $available = max(0, (int)$p['stock_qty'] - (int)($reservedTotal[$pid] ?? 0));
+    $desiredReserve = ($mode === 'mto') ? 0 : min($available, $orderQty);
+    $currentReserve = (int)($reservedByOrder[$pid] ?? 0);
+    $delta = $desiredReserve - $currentReserve;
+    if ($delta > 0){
+      stock_insert_movement($pdo, [
+        'product_id'=>$pid,
+        'qty'=>$delta,
+        'type'=>'reserve',
+        'reason'=>'order',
+        'order_id'=>$orderId,
+        'comment'=>'Резерв под заказ #'.$orderId,
+      ]);
+      $reservedTotal[$pid] = ($reservedTotal[$pid] ?? 0) + $delta;
+    } elseif ($delta < 0){
+      stock_insert_movement($pdo, [
+        'product_id'=>$pid,
+        'qty'=>abs($delta),
+        'type'=>'release',
+        'reason'=>'order',
+        'order_id'=>$orderId,
+        'comment'=>'Снятие резерва #'.$orderId,
+      ]);
+      $reservedTotal[$pid] = ($reservedTotal[$pid] ?? 0) - abs($delta);
+    }
+
+    $missing = ($mode === 'mto') ? $orderQty : max(0, $orderQty - $desiredReserve);
+    $prod = $prodByOrder[$pid] ?? null;
+    if ($missing > 0){
+      if ($prod){
+        $newQty = (int)$prod['qty_done'] + $missing;
+        $upd = $pdo->prepare("UPDATE production_orders SET qty = :q, status='open' WHERE id = :id");
+        $upd->execute([':q'=>$newQty, ':id'=>$prod['id']]);
+      } else {
+        $ins = $pdo->prepare("INSERT INTO production_orders (product_id, order_id, qty, qty_done, status, comment, created_by)
+          VALUES (:pid,:oid,:q,0,'open',:cmt,:cb)");
+        $ins->execute([
+          ':pid'=>$pid,
+          ':oid'=>$orderId,
+          ':q'=>$missing,
+          ':cmt'=>'Под заказ #'.$orderId,
+          ':cb'=>'admin',
+        ]);
+      }
+    } else {
+      if ($prod){
+        $upd = $pdo->prepare("UPDATE production_orders SET status='cancelled' WHERE id = :id");
+        $upd->execute([':id'=>$prod['id']]);
+      }
+    }
+  }
+}
+
+function stock_cancel_order(PDO $pdo, int $orderId){
+  stock_bootstrap($pdo);
+  $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
+  foreach ($reservedByOrder as $pid=>$qty){
+    if ($qty <= 0) continue;
+    stock_insert_movement($pdo, [
+      'product_id'=>$pid,
+      'qty'=>$qty,
+      'type'=>'release',
+      'reason'=>'order',
+      'order_id'=>$orderId,
+      'comment'=>'Снятие резерва (отмена) #'.$orderId,
+    ]);
+  }
+  $pdo->prepare("UPDATE production_orders SET status='cancelled' WHERE order_id = :oid AND status='open'")
+      ->execute([':oid'=>$orderId]);
+}
+
+function stock_fulfill_order(PDO $pdo, int $orderId){
+  stock_bootstrap($pdo);
+  $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
+  foreach ($reservedByOrder as $pid=>$qty){
+    if ($qty <= 0) continue;
+    stock_insert_movement($pdo, [
+      'product_id'=>$pid,
+      'qty'=>$qty,
+      'type'=>'out',
+      'reason'=>'order',
+      'order_id'=>$orderId,
+      'comment'=>'Списание по заказу #'.$orderId,
+    ]);
+    $pdo->prepare("UPDATE products SET stock_qty = stock_qty - :q WHERE id = :id")
+        ->execute([':q'=>$qty, ':id'=>$pid]);
+    stock_insert_movement($pdo, [
+      'product_id'=>$pid,
+      'qty'=>$qty,
+      'type'=>'release',
+      'reason'=>'order',
+      'order_id'=>$orderId,
+      'comment'=>'Снятие резерва (выполнен) #'.$orderId,
+    ]);
+  }
+  $pdo->prepare("UPDATE production_orders SET status='closed', qty_done = qty WHERE order_id = :oid AND status='open'")
+      ->execute([':oid'=>$orderId]);
+}
+
+function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newStatus){
+  try {
+    $reserveStatuses = ['В работе','Критическое ожидание'];
+    if (in_array($newStatus, $reserveStatuses, true)){
+      stock_apply_reservation($pdo, $orderId);
+    } elseif ($newStatus === 'Выполнен') {
+      stock_fulfill_order($pdo, $orderId);
+    } else {
+      stock_cancel_order($pdo, $orderId);
+    }
+  } catch (Throwable $e) {
+    // intentionally ignore to avoid breaking order flow
+  }
+}
+
 $uri = strtok($_SERVER['REQUEST_URI'], '?');
 $method = $_SERVER['REQUEST_METHOD'];
 $base = '/api';
