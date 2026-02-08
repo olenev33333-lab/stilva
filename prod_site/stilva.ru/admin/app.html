@@ -827,6 +827,16 @@
               <div class="adm-field"><label>Посадочные страницы (строки: slug | Title | Description | H1 | Lead | SEO Text)</label><textarea id="set_home_landing_items" rows="8"></textarea></div>
             </div>
           </div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label><input type="checkbox" id="set_home_show_cases"> Показывать блок «Сферы применения»</label></div>
+              <div class="adm-field"><label><input type="checkbox" id="set_home_show_types"> Показывать блок «Типы стеллажей»</label></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label><input type="checkbox" id="set_home_show_seo"> Показывать SEO‑блок на главной</label></div>
+              <div class="adm-field"><label><input type="checkbox" id="set_home_show_links"> Показывать ссылки‑плашки над каталогом</label></div>
+            </div>
+          </div>
           <div class="muted">Для списков используйте формат: Заголовок | Текст (одна строка — один элемент).</div>
         </div>
 
@@ -3087,7 +3097,7 @@ async function loadStatsLeft(){
 
     document.getElementById('set_home_hero_eyebrow').value = home.hero_eyebrow || 'стеллажи из нержавеющей стали';
     document.getElementById('set_home_hero_title').value = home.hero_title || 'Стеллажи для кухни,\\nобщепита и склада';
-    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Типовые размеры и изготовление под задачу. Подбор стали AISI 304/430, перфорированные или сплошные полки, аккуратная сборка.';
+    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Типовые размеры и изготовление под задачу. Сталь AISI 304/430, быстрая сборка, диагональное усиление и каркас жёсткости полок.';
     document.getElementById('set_home_hero_cta1_text').value = home.hero_cta1_text || 'Каталог';
     document.getElementById('set_home_hero_cta1_link').value = home.hero_cta1_link || '#catalog';
     document.getElementById('set_home_hero_cta2_text').value = home.hero_cta2_text || 'Получить расчёт';
@@ -3095,11 +3105,11 @@ async function loadStatsLeft(){
 
     document.getElementById('set_home_benefits_title').value = home.benefits_title || 'Почему STILVA';
     document.getElementById('set_home_benefits_lead').value = home.benefits_lead || 'Коммерческий класс для рабочих зон: кухня, общепит, склад.';
-    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Сталь под задачу|Подберём AISI 304/430 под условия эксплуатации.\\nКонфигурации|Перфорированные или сплошные полки, нужное количество ярусов.\\nТиповые и под заказ|Быстрое решение из каталога или изготовление под нишу.';
+    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Быстрая сборка|Сборно‑разборная конструкция без сложных узлов.\\nЖёсткость|Диагональное усиление и каркас жёсткости на полках.\\nСталь под задачу|Подберём AISI 304/430 под условия эксплуатации.';
 
     document.getElementById('set_home_specs_title').value = home.specs_title || 'Характеристики и размеры';
     document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Типовой ряд и индивидуальные решения.';
-    document.getElementById('set_home_specs_items').value = home.specs_items || 'Полки|Перфорированные или сплошные — под задачу хранения.\\nРазмеры|Типовой ряд: ширина 800–1200, глубина 300–600, высота 1800 мм.\\nСборка|Разборные или сварные исполнения.\\nРегулировка|Возможна настройка уровня полок по высоте.\\nОпоры|Регулируемые опоры для ровной установки.\\nСроки|Согласуем до старта производства.';
+    document.getElementById('set_home_specs_items').value = home.specs_items || 'Полки|Перфорированные или сплошные — под задачу хранения.\\nРазмеры|Типовой ряд — как в каталоге.\\nСборка|Разборные или сварные исполнения.\\nРегулировка|Возможна настройка уровня полок по высоте.\\nОпоры|Регулируемые опоры для ровной установки.\\nСроки|Согласуем до старта производства.';
 
     document.getElementById('set_home_cases_title').value = home.cases_title || 'Сферы применения';
     document.getElementById('set_home_cases_lead').value = home.cases_lead || 'Решения под рабочие зоны и санитарные требования.';
@@ -3120,8 +3130,12 @@ async function loadStatsLeft(){
     document.getElementById('set_home_wa_phone').value = home.wa_phone || '79000000000';
 
     document.getElementById('set_home_seo_title').value = home.seo_title || 'Стеллажи из нержавейки для кухни, общепита и склада';
-    document.getElementById('set_home_seo_text').value = home.seo_text || 'STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров закрывает большинство задач: ширина 800–1200 мм, глубина 300–600 мм, высота 1800 мм.\\n\\nПодберём сталь под условия эксплуатации (AISI 304/430), тип полок (перфорированные или сплошные), количество ярусов и исполнение (разборное или сварное).\\n\\nЕсли нужно нестандартное решение — изготовим под задачу, согласуем сроки и доставку.';
+    document.getElementById('set_home_seo_text').value = home.seo_text || 'STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров — как в каталоге, нестандартные решения — под задачу.\\n\\nПодберём сталь AISI 304/430, тип полок (перфорированные или сплошные) и конфигурацию. Конструкция с быстрой сборкой, диагональным усилением и каркасом жёсткости на полках.\\n\\nСогласуем сроки и доставку по России.';
     document.getElementById('set_home_landing_items').value = home.landing_items || '';
+    document.getElementById('set_home_show_cases').checked = !!home.show_cases;
+    document.getElementById('set_home_show_types').checked = !!home.show_types;
+    document.getElementById('set_home_show_seo').checked = !!home.show_seo_block;
+    document.getElementById('set_home_show_links').checked = !!home.show_landing_links;
   }
 
   async function saveSettings(){
@@ -3198,7 +3212,11 @@ async function loadStatsLeft(){
         wa_phone: (document.getElementById('set_home_wa_phone').value || '').trim(),
         seo_title: (document.getElementById('set_home_seo_title').value || '').trim(),
         seo_text: (document.getElementById('set_home_seo_text').value || '').trim(),
-        landing_items: (document.getElementById('set_home_landing_items').value || '').trim()
+        landing_items: (document.getElementById('set_home_landing_items').value || '').trim(),
+        show_cases: document.getElementById('set_home_show_cases').checked ? 1 : 0,
+        show_types: document.getElementById('set_home_show_types').checked ? 1 : 0,
+        show_seo_block: document.getElementById('set_home_show_seo').checked ? 1 : 0,
+        show_landing_links: document.getElementById('set_home_show_links').checked ? 1 : 0
       }
     };
     const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });

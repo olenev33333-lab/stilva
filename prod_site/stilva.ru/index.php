@@ -246,7 +246,7 @@ if ($landingConfig) {
 
 $homeHeroEyebrow = trim((string)($home['hero_eyebrow'] ?? 'стеллажи из нержавеющей стали'));
 $homeHeroTitle = trim((string)($home['hero_title'] ?? "Стеллажи для кухни,\nобщепита и склада"));
-$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Типовые размеры и изготовление под задачу. Подбор стали AISI 304/430, перфорированные или сплошные полки, аккуратная сборка.'));
+$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Типовые размеры и изготовление под задачу. Сталь AISI 304/430, быстрая сборка, диагональное усиление и каркас жёсткости полок.'));
 $homeHeroCta1Text = trim((string)($home['hero_cta1_text'] ?? 'Каталог'));
 $homeHeroCta1Link = trim((string)($home['hero_cta1_link'] ?? '#catalog'));
 $homeHeroCta2Text = trim((string)($home['hero_cta2_text'] ?? 'Получить расчёт'));
@@ -254,12 +254,12 @@ $homeHeroCta2Link = trim((string)($home['hero_cta2_link'] ?? '#contacts'));
 
 $homeBenefitsTitle = trim((string)($home['benefits_title'] ?? 'Почему STILVA'));
 $homeBenefitsLead = trim((string)($home['benefits_lead'] ?? 'Коммерческий класс для рабочих зон: кухня, общепит, склад.'));
-$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Сталь под задачу|Подберём AISI 304/430 под условия эксплуатации.\nКонфигурации|Перфорированные или сплошные полки, нужное количество ярусов.\nТиповые и под заказ|Быстрое решение из каталога или изготовление под нишу."));
+$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Быстрая сборка|Сборно‑разборная конструкция без сложных узлов.\nЖёсткость|Диагональное усиление и каркас жёсткости на полках.\nСталь под задачу|Подберём AISI 304/430 под условия эксплуатации."));
 $homeBenefits = parse_pairs($homeBenefitsRaw);
 
 $homeSpecsTitle = trim((string)($home['specs_title'] ?? 'Характеристики и размеры'));
 $homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Типовой ряд и индивидуальные решения.'));
-$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Полки|Перфорированные или сплошные — под задачу хранения.\nРазмеры|Типовой ряд: ширина 800–1200, глубина 300–600, высота 1800 мм.\nСборка|Разборные или сварные исполнения.\nРегулировка|Возможна настройка уровня полок по высоте.\nОпоры|Регулируемые опоры для ровной установки.\nСроки|Согласуем до старта производства."));
+$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Полки|Перфорированные или сплошные — под задачу хранения.\nРазмеры|Типовой ряд — как в каталоге.\nСборка|Разборные или сварные исполнения.\nРегулировка|Возможна настройка уровня полок по высоте.\nОпоры|Регулируемые опоры для ровной установки.\nСроки|Согласуем до старта производства."));
 $homeSpecs = parse_pairs($homeSpecsRaw);
 
 $homeCasesTitle = trim((string)($home['cases_title'] ?? 'Сферы применения'));
@@ -287,7 +287,12 @@ $homeWaDigits = phone_digits($homeWaPhone);
 if ($homeWaDigits === '') $homeWaDigits = '79000000000';
 
 $homeSeoTitle = trim((string)($home['seo_title'] ?? 'Стеллажи из нержавейки для кухни, общепита и склада'));
-$homeSeoText = trim((string)($home['seo_text'] ?? "STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров закрывает большинство задач: ширина 800–1200 мм, глубина 300–600 мм, высота 1800 мм.\n\nПодберём сталь под условия эксплуатации (AISI 304/430), тип полок (перфорированные или сплошные), количество ярусов и исполнение (разборное или сварное).\n\nЕсли нужно нестандартное решение — изготовим под задачу, согласуем сроки и доставку."));
+$homeSeoText = trim((string)($home['seo_text'] ?? "STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров — как в каталоге, нестандартные решения — под задачу.\n\nПодберём сталь AISI 304/430, тип полок (перфорированные или сплошные) и конфигурацию. Конструкция с быстрой сборкой, диагональным усилением и каркасом жёсткости на полках.\n\nСогласуем сроки и доставку по России."));
+
+$showCases = !empty($home['show_cases']);
+$showTypes = !empty($home['show_types']);
+$showSeoBlock = !empty($home['show_seo_block']);
+$showLandingLinks = !empty($home['show_landing_links']);
 
 $defaultTitle = 'Стеллажи из нержавеющей стали для общепита и склада — STILVA';
 $title = trim((string)($seo['title'] ?? $defaultTitle));
@@ -325,8 +330,6 @@ if ($ogLocale === '') $ogLocale = 'ru_RU';
 $ogImageRaw = trim((string)($seo['og_image'] ?? ''));
 if ($ogImageRaw === '') $ogImageRaw = '/pictures/1000x400x1800.png';
 $ogImage = abs_url($ogImageRaw, $base, $scheme);
-$ogImageAlt = $productView ? trim((string)($productView['name'] ?? '')) : ($siteName.' — стеллажи из нержавеющей стали');
-if ($ogImageAlt === '') $ogImageAlt = $siteName;
 
 $twitterCard = trim((string)($seo['twitter_card'] ?? 'summary_large_image'));
 if ($twitterCard === '') $twitterCard = 'summary_large_image';
@@ -401,7 +404,14 @@ if ($landingConfig && $pageSlug !== '') {
     $homeSeoTitle = $landingH1 !== '' ? $landingH1 : $homeSeoTitle;
     $homeSeoText = $landingText;
   }
+  $showCases = true;
+  $showTypes = true;
+  $showSeoBlock = true;
+  $showLandingLinks = false;
 }
+
+$ogImageAlt = $productView ? trim((string)($productView['name'] ?? '')) : ($siteName.' — стеллажи из нержавеющей стали');
+if ($ogImageAlt === '') $ogImageAlt = $siteName;
 
 $catalogHtml = '';
 if ($products){
@@ -437,8 +447,9 @@ if ($products){
     foreach ($tags as $t){ $tagsHtml .= '<span class="tag">'.h($t).'</span>'; }
 
     $img = trim((string)($p['image_url'] ?? ''));
-    $imgHtml = $img !== ''
-      ? '<img src="'.h($img).'" data-full="'.h($img).'" alt="'.h($titleText).'" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">'
+    $imgUrl = $img !== '' ? abs_url($img, $base, $scheme) : '';
+    $imgHtml = $imgUrl !== ''
+      ? '<img src="'.h($imgUrl).'" data-full="'.h($imgUrl).'" alt="'.h($titleText).'" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">'
       : 'Фото изделия';
 
     $priceText = number_format($price, 0, '.', ' ');
@@ -706,7 +717,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <?php if ($ld): ?>
 <script type="application/ld+json"><?= $ld ?></script>
 <?php endif; ?>
-<link href="assets/css/main.css" rel="stylesheet"/>
+<link href="/assets/css/main.css" rel="stylesheet"/>
 </head>
 <body>
 <!-- Header -->
@@ -759,22 +770,24 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <h2 class="h2">Каталог готовых решений</h2>
 <p class="lead">Доверьтесь нашему опыту - ниже представлены самые лучше образцы нашей продукции.</p>
 </div>
-<?php
-  $landingLinks = array_keys($defaultLandings);
-  $landingTitles = [
-    'obshchepit' => 'Стеллажи для общепита',
-    'kukhnya' => 'Стеллажи для кухни',
-    'sklad' => 'Стеллажи для склада',
-    'pod-zakaz' => 'Стеллажи под заказ',
-    'perforirovannye-polki' => 'Перфорированные полки',
-    'sploshnye-polki' => 'Сплошные полки'
-  ];
-?>
-<div class="catalog-links">
-<?php foreach ($landingLinks as $slug): ?>
-  <a class="tag" href="/lp/<?= h($slug) ?>/"><?= h($landingTitles[$slug] ?? $slug) ?></a>
-<?php endforeach; ?>
-</div>
+<?php if ($showLandingLinks): ?>
+  <?php
+    $landingLinks = array_keys($defaultLandings);
+    $landingTitles = [
+      'obshchepit' => 'Стеллажи для общепита',
+      'kukhnya' => 'Стеллажи для кухни',
+      'sklad' => 'Стеллажи для склада',
+      'pod-zakaz' => 'Стеллажи под заказ',
+      'perforirovannye-polki' => 'Перфорированные полки',
+      'sploshnye-polki' => 'Сплошные полки'
+    ];
+  ?>
+  <div class="catalog-links">
+  <?php foreach ($landingLinks as $slug): ?>
+    <a class="tag" href="/lp/<?= h($slug) ?>/"><?= h($landingTitles[$slug] ?? $slug) ?></a>
+  <?php endforeach; ?>
+  </div>
+<?php endif; ?>
 <div class="catalog__grid"><?php if ($catalogHtml !== '') echo $catalogHtml; ?></div>
 </section>
 <!-- Specs -->
@@ -789,7 +802,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <?php endforeach; ?>
 </div>
 </section>
-<?php if ($homeCases): ?>
+<?php if ($showCases && $homeCases): ?>
 <section class="wrap section" id="cases">
 <div class="section__head">
 <h2 class="h2"><?= h($homeCasesTitle) ?></h2>
@@ -802,7 +815,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 </div>
 </section>
 <?php endif; ?>
-<?php if ($homeTypes): ?>
+<?php if ($showTypes && $homeTypes): ?>
 <section class="wrap section" id="types">
 <div class="section__head">
 <h2 class="h2"><?= h($homeTypesTitle) ?></h2>
@@ -827,7 +840,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <?php endforeach; ?>
 </div>
 </section>
-<?php if ($homeSeoText !== ''): ?>
+<?php if ($showSeoBlock && $homeSeoText !== ''): ?>
 <section class="wrap section" id="seo-text">
 <div class="section__head">
 <h2 class="h2"><?= h($homeSeoTitle) ?></h2>
@@ -936,5 +949,5 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <!-- BEGIN: background cloud animator -->
 <!--Инлайновый скрипт #6 перенесён в assets/js/inline.js -->
 <!-- END: background cloud animator -->
-<script defer="True" src="assets/js/inline.js"></script></body>
+<script defer="True" src="/assets/js/inline.js"></script></body>
 </html>

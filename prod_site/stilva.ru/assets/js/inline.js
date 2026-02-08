@@ -102,6 +102,12 @@ document.addEventListener('click', (e)=>{
           return value || 'product';
         };
 
+        const absImg = (url)=>{
+          if (!url) return '';
+          if (/^https?:\\/\\//i.test(url) || url.startsWith('/')) return url;
+          return '/' + url.replace(/^\\/+/, '');
+        };
+
         grid.innerHTML = list.map(p=>{
           const title   = p.name || 'Товар';
           const slug = slugify(title);
@@ -109,9 +115,10 @@ document.addEventListener('click', (e)=>{
           const price   = +p.price || 0;
           const shelves = +p.shelves || 0;
           const desc    = (p.description || '').trim();
-const imgHtml = p.image_url
-  ? `<img src="${p.image_url}"
-          data-full="${p.image_full_url || p.image_url}"
+const imgUrl = absImg(p.image_url);
+const imgHtml = imgUrl
+  ? `<img src="${imgUrl}"
+          data-full="${absImg(p.image_full_url || p.image_url)}"
           alt="${title}"
           loading="lazy"
           decoding="async"
