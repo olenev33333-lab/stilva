@@ -776,6 +776,44 @@
           <div class="muted">Если поля OG и Twitter пустые — используются Title/Description. URL лучше задавать абсолютные.</div>
         </div>
 
+        <div class="order-section">
+          <div class="list-title">Главная страница</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label>Hero: надзаголовок</label><input type="text" id="set_home_hero_eyebrow"></div>
+              <div class="adm-field"><label>Hero: заголовок</label><textarea id="set_home_hero_title" rows="2"></textarea></div>
+              <div class="adm-field"><label>Hero: текст</label><textarea id="set_home_hero_lead" rows="3"></textarea></div>
+              <div class="adm-field"><label>Hero: кнопка 1 (текст)</label><input type="text" id="set_home_hero_cta1_text"></div>
+              <div class="adm-field"><label>Hero: кнопка 1 (ссылка)</label><input type="text" id="set_home_hero_cta1_link" placeholder="#catalog"></div>
+              <div class="adm-field"><label>Hero: кнопка 2 (текст)</label><input type="text" id="set_home_hero_cta2_text"></div>
+              <div class="adm-field"><label>Hero: кнопка 2 (ссылка)</label><input type="text" id="set_home_hero_cta2_link" placeholder="#specs"></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Плюсы: заголовок</label><input type="text" id="set_home_benefits_title"></div>
+              <div class="adm-field"><label>Плюсы: лид</label><textarea id="set_home_benefits_lead" rows="2"></textarea></div>
+              <div class="adm-field"><label>Плюсы (строки: Заголовок | Текст)</label><textarea id="set_home_benefits_items" rows="6"></textarea></div>
+              <div class="adm-field"><label>Характеристики: заголовок</label><input type="text" id="set_home_specs_title"></div>
+              <div class="adm-field"><label>Характеристики: лид</label><textarea id="set_home_specs_lead" rows="2"></textarea></div>
+              <div class="adm-field"><label>Характеристики (строки: Заголовок | Текст)</label><textarea id="set_home_specs_items" rows="6"></textarea></div>
+            </div>
+          </div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label>FAQ: заголовок</label><input type="text" id="set_home_faq_title"></div>
+              <div class="adm-field"><label>FAQ: лид</label><textarea id="set_home_faq_lead" rows="2"></textarea></div>
+              <div class="adm-field"><label>FAQ (строки: Вопрос | Ответ)</label><textarea id="set_home_faq_items" rows="6"></textarea></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Контакты: заголовок</label><input type="text" id="set_home_contacts_title"></div>
+              <div class="adm-field"><label>Контакты: лид</label><textarea id="set_home_contacts_lead" rows="2"></textarea></div>
+              <div class="adm-field"><label>Контакты: примечание</label><textarea id="set_home_contacts_note" rows="2"></textarea></div>
+              <div class="adm-field"><label>Telegram: username</label><input type="text" id="set_home_tg_handle" placeholder="stilva_support"></div>
+              <div class="adm-field"><label>WhatsApp: номер</label><input type="text" id="set_home_wa_phone" placeholder="79000000000"></div>
+            </div>
+          </div>
+          <div class="muted">Для списков используйте формат: Заголовок | Текст (одна строка — один элемент).</div>
+        </div>
+
         <div class="adm-actions">
           <button class="adm-btn adm-btn--accent" id="settings-save">Сохранить</button>
           <button class="adm-btn adm-btn--ghost" id="settings-cancel">Закрыть</button>
@@ -2993,6 +3031,7 @@ async function loadStatsLeft(){
     const data = res.ok ? await res.json() : {};
     const s = data.seller || {};
     const seo = data.seo || {};
+    const home = data.home || {};
     document.getElementById('set_seller_type').value = s.type || 'org';
     document.getElementById('set_seller_name').value = s.name || s.fio || '';
     document.getElementById('set_seller_inn').value = s.inn || '';
@@ -3029,6 +3068,32 @@ async function loadStatsLeft(){
     document.getElementById('set_seo_google_verification').value = seo.google_verification || '';
     document.getElementById('set_seo_yandex_verification').value = seo.yandex_verification || '';
     document.getElementById('set_seo_bing_verification').value = seo.bing_verification || '';
+
+    document.getElementById('set_home_hero_eyebrow').value = home.hero_eyebrow || 'стеллажи из нержавейки';
+    document.getElementById('set_home_hero_title').value = home.hero_title || 'Аккуратное хранение\\nбез компромиссов';
+    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Надёжные и визуально аккуратные решения для кухни, торгового зала, офиса и склада. Спокойно работают годами и сохраняют порядок.';
+    document.getElementById('set_home_hero_cta1_text').value = home.hero_cta1_text || 'Смотреть каталог';
+    document.getElementById('set_home_hero_cta1_link').value = home.hero_cta1_link || '#catalog';
+    document.getElementById('set_home_hero_cta2_text').value = home.hero_cta2_text || 'Характеристики';
+    document.getElementById('set_home_hero_cta2_link').value = home.hero_cta2_link || '#specs';
+
+    document.getElementById('set_home_benefits_title').value = home.benefits_title || 'Что вы получаете';
+    document.getElementById('set_home_benefits_lead').value = home.benefits_lead || 'Готовые к работе стеллажи с понятными преимуществами — без сюрпризов в эксплуатации.';
+    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Жёсткая геометрия|Полки держат форму под нагрузкой. Конструкция ровная годами.\\nГигиена и быстрый уход|Гладкая обработка, минимум стыков и зазоров.\\nЧистый внешний вид|Аккуратный дизайн уместен в зале и на кухне.';
+
+    document.getElementById('set_home_specs_title').value = home.specs_title || 'Характеристики';
+    document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Базовые параметры без лишней терминологии.';
+    document.getElementById('set_home_specs_items').value = home.specs_items || 'Материал|Нержавеющая сталь с чистовой обработкой\\nСборка|Сварная или разборная — по месту и задаче\\nОпции|Бортики, колёса, крепёж к стене, регулировка по высоте\\nЭксплуатация|Кухни, торговые залы, офисы, склады\\nНагрузка|До 80–160 кг на полку в зависимости от серии\\nРазмеры|Ширина 60–180, глубина 40–60, высота 160–200 см';
+
+    document.getElementById('set_home_faq_title').value = home.faq_title || 'FAQ';
+    document.getElementById('set_home_faq_lead').value = home.faq_lead || 'Коротко на частые вопросы.';
+    document.getElementById('set_home_faq_items').value = home.faq_items || 'Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\\nКак ухаживать?|Нейтральные моющие, без абразива и агрессивной химии.\\nДоставка и монтаж?|Да, условия фиксируем в смете.\\nСроки?|Зависят от конфигурации. Подтверждаем до старта.';
+
+    document.getElementById('set_home_contacts_title').value = home.contacts_title || 'Свяжитесь с нами';
+    document.getElementById('set_home_contacts_lead').value = home.contacts_lead || 'Подробно осудим все детали и возможные нестандартные решения.';
+    document.getElementById('set_home_contacts_note').value = home.contacts_note || '';
+    document.getElementById('set_home_tg_handle').value = home.tg_handle || 'stilva_support';
+    document.getElementById('set_home_wa_phone').value = home.wa_phone || '79000000000';
   }
 
   async function saveSettings(){
@@ -3074,6 +3139,29 @@ async function loadStatsLeft(){
         google_verification: (document.getElementById('set_seo_google_verification').value || '').trim(),
         yandex_verification: (document.getElementById('set_seo_yandex_verification').value || '').trim(),
         bing_verification: (document.getElementById('set_seo_bing_verification').value || '').trim()
+      },
+      home: {
+        hero_eyebrow: (document.getElementById('set_home_hero_eyebrow').value || '').trim(),
+        hero_title: (document.getElementById('set_home_hero_title').value || '').trim(),
+        hero_lead: (document.getElementById('set_home_hero_lead').value || '').trim(),
+        hero_cta1_text: (document.getElementById('set_home_hero_cta1_text').value || '').trim(),
+        hero_cta1_link: (document.getElementById('set_home_hero_cta1_link').value || '').trim(),
+        hero_cta2_text: (document.getElementById('set_home_hero_cta2_text').value || '').trim(),
+        hero_cta2_link: (document.getElementById('set_home_hero_cta2_link').value || '').trim(),
+        benefits_title: (document.getElementById('set_home_benefits_title').value || '').trim(),
+        benefits_lead: (document.getElementById('set_home_benefits_lead').value || '').trim(),
+        benefits_items: (document.getElementById('set_home_benefits_items').value || '').trim(),
+        specs_title: (document.getElementById('set_home_specs_title').value || '').trim(),
+        specs_lead: (document.getElementById('set_home_specs_lead').value || '').trim(),
+        specs_items: (document.getElementById('set_home_specs_items').value || '').trim(),
+        faq_title: (document.getElementById('set_home_faq_title').value || '').trim(),
+        faq_lead: (document.getElementById('set_home_faq_lead').value || '').trim(),
+        faq_items: (document.getElementById('set_home_faq_items').value || '').trim(),
+        contacts_title: (document.getElementById('set_home_contacts_title').value || '').trim(),
+        contacts_lead: (document.getElementById('set_home_contacts_lead').value || '').trim(),
+        contacts_note: (document.getElementById('set_home_contacts_note').value || '').trim(),
+        tg_handle: (document.getElementById('set_home_tg_handle').value || '').trim(),
+        wa_phone: (document.getElementById('set_home_wa_phone').value || '').trim()
       }
     };
     const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });

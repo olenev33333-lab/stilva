@@ -50,6 +50,26 @@ function phone_digits(string $value): string {
   return preg_replace('/\\D+/', '', $value) ?? '';
 }
 
+function render_multiline(string $value): string {
+  return nl2br(h($value));
+}
+
+function parse_pairs(string $raw): array {
+  $out = [];
+  $lines = preg_split('/\\r\\n|\\r|\\n/', $raw);
+  foreach ($lines as $line){
+    $line = trim($line);
+    if ($line === '') continue;
+    $pos = strpos($line, '|');
+    if ($pos === false) continue;
+    $title = trim(substr($line, 0, $pos));
+    $text = trim(substr($line, $pos + 1));
+    if ($title === '' || $text === '') continue;
+    $out[] = ['title'=>$title, 'text'=>$text];
+  }
+  return $out;
+}
+
 function table_exists(PDO $pdo, string $name): bool {
   $stmt = $pdo->prepare("SHOW TABLES LIKE :t");
   $stmt->execute([':t'=>$name]);
@@ -58,6 +78,7 @@ function table_exists(PDO $pdo, string $name): bool {
 
 $seo = [];
 $seller = [];
+$home = [];
 $products = [];
 $reservedMap = [];
 $onOrderMap = [];
@@ -65,6 +86,7 @@ try {
   $pdo = db();
   $seo = settings_get($pdo, 'seo', []);
   $seller = settings_get($pdo, 'seller', []);
+  $home = settings_get($pdo, 'home', []);
   try {
     $stmt = $pdo->query("SELECT id, name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, supply_mode
                          FROM products WHERE published = 1 ORDER BY id ASC");
@@ -95,6 +117,7 @@ try {
 } catch (Throwable $e) {
   $seo = [];
   $seller = [];
+  $home = [];
   $products = [];
   $reservedMap = [];
   $onOrderMap = [];
@@ -106,6 +129,38 @@ $base = $scheme . '://' . $host . '/';
 
 $siteName = trim((string)($seo['site_name'] ?? 'STILVA'));
 if ($siteName === '') $siteName = 'STILVA';
+
+$homeHeroEyebrow = trim((string)($home['hero_eyebrow'] ?? 'стеллажи из нержавейки'));
+$homeHeroTitle = trim((string)($home['hero_title'] ?? "Аккуратное хранение\nбез компромиссов"));
+$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Надёжные и визуально аккуратные решения для кухни, торгового зала, офиса и склада. Спокойно работают годами и сохраняют порядок.'));
+$homeHeroCta1Text = trim((string)($home['hero_cta1_text'] ?? 'Смотреть каталог'));
+$homeHeroCta1Link = trim((string)($home['hero_cta1_link'] ?? '#catalog'));
+$homeHeroCta2Text = trim((string)($home['hero_cta2_text'] ?? 'Характеристики'));
+$homeHeroCta2Link = trim((string)($home['hero_cta2_link'] ?? '#specs'));
+
+$homeBenefitsTitle = trim((string)($home['benefits_title'] ?? 'Что вы получаете'));
+$homeBenefitsLead = trim((string)($home['benefits_lead'] ?? 'Готовые к работе стеллажи с понятными преимуществами — без сюрпризов в эксплуатации.'));
+$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Жёсткая геометрия|Полки держат форму под нагрузкой. Конструкция ровная годами.\nГигиена и быстрый уход|Гладкая обработка, минимум стыков и зазоров.\nЧистый внешний вид|Аккуратный дизайн уместен в зале и на кухне."));
+$homeBenefits = parse_pairs($homeBenefitsRaw);
+
+$homeSpecsTitle = trim((string)($home['specs_title'] ?? 'Характеристики'));
+$homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Базовые параметры без лишней терминологии.'));
+$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Материал|Нержавеющая сталь с чистовой обработкой\nСборка|Сварная или разборная — по месту и задаче\nОпции|Бортики, колёса, крепёж к стене, регулировка по высоте\nЭксплуатация|Кухни, торговые залы, офисы, склады\nНагрузка|До 80–160 кг на полку в зависимости от серии\nРазмеры|Ширина 60–180, глубина 40–60, высота 160–200 см"));
+$homeSpecs = parse_pairs($homeSpecsRaw);
+
+$homeFaqTitle = trim((string)($home['faq_title'] ?? 'FAQ'));
+$homeFaqLead = trim((string)($home['faq_lead'] ?? 'Коротко на частые вопросы.'));
+$homeFaqRaw = trim((string)($home['faq_items'] ?? "Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\nКак ухаживать?|Нейтральные моющие, без абразива и агрессивной химии.\nДоставка и монтаж?|Да, условия фиксируем в смете.\nСроки?|Зависят от конфигурации. Подтверждаем до старта."));
+$homeFaq = parse_pairs($homeFaqRaw);
+
+$homeContactsTitle = trim((string)($home['contacts_title'] ?? 'Свяжитесь с нами'));
+$homeContactsLead = trim((string)($home['contacts_lead'] ?? 'Подробно осудим все детали и возможные нестандартные решения.'));
+$homeContactsNote = trim((string)($home['contacts_note'] ?? ''));
+$homeTgHandle = trim((string)($home['tg_handle'] ?? 'stilva_support'));
+$homeTgHandle = ltrim($homeTgHandle, '@');
+$homeWaPhone = trim((string)($home['wa_phone'] ?? '79000000000'));
+$homeWaDigits = phone_digits($homeWaPhone);
+if ($homeWaDigits === '') $homeWaDigits = '79000000000';
 
 $defaultTitle = 'STILVA — стеллажи из нержавейки';
 $title = trim((string)($seo['title'] ?? $defaultTitle));
@@ -157,9 +212,9 @@ if ($contactPhone === '') $contactPhone = '+7 000 000 00 00';
 $contactPhoneTel = phone_digits($contactPhone);
 if ($contactPhoneTel === '') $contactPhoneTel = '70000000000';
 $contactAddress = trim((string)($seller['address'] ?? ''));
-$contactNote = $contactAddress !== ''
+$contactNote = $homeContactsNote !== '' ? $homeContactsNote : ($contactAddress !== ''
   ? 'Пн–пт 10:00–19:00 • '.$contactAddress.' • Работаем по всей России'
-  : 'Пн–пт 10:00–19:00 • Москва • Работаем по всей России';
+  : 'Пн–пт 10:00–19:00 • Москва • Работаем по всей России');
 
 $productView = null;
 $productIdParam = isset($_GET['product']) ? (int)$_GET['product'] : 0;
@@ -292,21 +347,15 @@ $website = [
 
 $ldObjects = [$org, $website];
 // FAQ structured data
-$faqItems = [
-  ['q'=>'Нестандартные размеры?', 'a'=>'Да. Подгоняем под нишу, углы и высоту потолка.'],
-  ['q'=>'Как ухаживать?', 'a'=>'Нейтральные моющие, без абразива и агрессивной химии.'],
-  ['q'=>'Доставка и монтаж?', 'a'=>'Да, условия фиксируем в смете.'],
-  ['q'=>'Сроки?', 'a'=>'Зависят от конфигурации. Подтверждаем до старта.']
-];
-if ($faqItems){
+if ($homeFaq){
   $faq = [
     '@context' => 'https://schema.org',
     '@type' => 'FAQPage',
     'mainEntity' => []
   ];
-  foreach ($faqItems as $f){
-    $q = trim((string)($f['q'] ?? ''));
-    $a = trim((string)($f['a'] ?? ''));
+  foreach ($homeFaq as $f){
+    $q = trim((string)($f['title'] ?? ''));
+    $a = trim((string)($f['text'] ?? ''));
     if ($q === '' || $a === '') continue;
     $faq['mainEntity'][] = [
       '@type' => 'Question',
@@ -472,11 +521,12 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <div class="hero__grid">
 <div>
 <span class="eyebrow">стеллажи из нержавейки</span>
-<h1>Аккуратное хранение <br/>без компромиссов</h1>
-<p>Надёжные и визуально аккуратные решения для кухни, торгового зала, офиса и склада. Спокойно работают годами и сохраняют порядок.</p>
+<span class="eyebrow"><?= h($homeHeroEyebrow) ?></span>
+<h1><?= render_multiline($homeHeroTitle) ?></h1>
+<p><?= h($homeHeroLead) ?></p>
 <div class="cta-row">
-<a class="btn" href="#catalog">Смотреть каталог</a>
-<a class="btn btn--ghost" href="#specs">Характеристики</a>
+<a class="btn" href="<?= h($homeHeroCta1Link) ?>"><?= h($homeHeroCta1Text) ?></a>
+<a class="btn btn--ghost" href="<?= h($homeHeroCta2Link) ?>"><?= h($homeHeroCta2Text) ?></a>
 </div>
 </div>
 <div class="hero__media"><div aria-live="polite" class="hero-mini" id="hero-mini"></div></div>
@@ -486,13 +536,13 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <!-- WHAT YOU GET -->
 <section class="wrap section" id="benefits">
 <div class="section__head">
-<h2 class="h2">Что вы получаете</h2>
-<p class="lead">Готовые к работе стеллажи с понятными преимуществами — без сюрпризов в эксплуатации.</p>
+<h2 class="h2"><?= h($homeBenefitsTitle) ?></h2>
+<p class="lead"><?= h($homeBenefitsLead) ?></p>
 </div>
 <div class="catalog__grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-inline:var(--side)">
-<div class="product"><div class="product__body"><div class="product__title">Жёсткая геометрия</div><div class="product__meta">Полки держат форму под нагрузкой. Конструкция ровная годами.</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Гигиена и быстрый уход</div><div class="product__meta">Гладкая обработка, минимум стыков и зазоров.</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Чистый внешний вид</div><div class="product__meta">Аккуратный дизайн уместен в зале и на кухне.</div></div></div>
+<?php foreach ($homeBenefits as $it): ?>
+<div class="product"><div class="product__body"><div class="product__title"><?= h($it['title']) ?></div><div class="product__meta"><?= h($it['text']) ?></div></div></div>
+<?php endforeach; ?>
 </div>
 </section>
 <!-- Catalog -->
@@ -506,35 +556,31 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <!-- Specs -->
 <section class="wrap section" id="specs">
 <div class="section__head">
-<h2 class="h2">Характеристики</h2>
-<p class="lead">Базовые параметры без лишней терминологии.</p>
+<h2 class="h2"><?= h($homeSpecsTitle) ?></h2>
+<p class="lead"><?= h($homeSpecsLead) ?></p>
 </div>
 <div class="catalog__grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-inline:var(--side)">
-<div class="product"><div class="product__body"><div class="product__title">Материал</div><div class="product__meta">Нержавеющая сталь с чистовой обработкой</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Сборка</div><div class="product__meta">Сварная или разборная — по месту и задаче</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Опции</div><div class="product__meta">Бортики, колёса, крепёж к стене, регулировка по высоте</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Эксплуатация</div><div class="product__meta">Кухни, торговые залы, офисы, склады</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Нагрузка</div><div class="product__meta">До 80–160 кг на полку в зависимости от серии</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Размеры</div><div class="product__meta">Ширина 60–180, глубина 40–60, высота 160–200 см</div></div></div>
+<?php foreach ($homeSpecs as $it): ?>
+<div class="product"><div class="product__body"><div class="product__title"><?= h($it['title']) ?></div><div class="product__meta"><?= h($it['text']) ?></div></div></div>
+<?php endforeach; ?>
 </div>
 </section>
 <!-- FAQ -->
 <section class="wrap section" id="faq">
 <div class="section__head">
-<h2 class="h2">FAQ</h2>
-<p class="lead">Коротко на частые вопросы.</p>
+<h2 class="h2"><?= h($homeFaqTitle) ?></h2>
+<p class="lead"><?= h($homeFaqLead) ?></p>
 </div>
 <div class="catalog__grid" style="grid-template-columns:1fr 1fr;gap:16px;padding-inline:var(--side)">
-<div class="product"><div class="product__body"><div class="product__title">Нестандартные размеры?</div><div class="product__meta">Да. Подгоняем под нишу, углы и высоту потолка.</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Как ухаживать?</div><div class="product__meta">Нейтральные моющие, без абразива и агрессивной химии.</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Доставка и монтаж?</div><div class="product__meta">Да, условия фиксируем в смете.</div></div></div>
-<div class="product"><div class="product__body"><div class="product__title">Сроки?</div><div class="product__meta">Зависят от конфигурации. Подтверждаем до старта.</div></div></div>
+<?php foreach ($homeFaq as $it): ?>
+<div class="product"><div class="product__body"><div class="product__title"><?= h($it['title']) ?></div><div class="product__meta"><?= h($it['text']) ?></div></div></div>
+<?php endforeach; ?>
 </div>
 </section>
 <section aria-label="Контакты" class="contacts" id="contacts">
 <div class="section__head">
-<h2 class="h2">Свяжитесь с нами</h2>
-<p class="lead">Подробно осудим все детали и возможные нестандартные решения.</p>
+<h2 class="h2"><?= h($homeContactsTitle) ?></h2>
+<p class="lead"><?= h($homeContactsLead) ?></p>
 </div>
 <div class="contacts__grid">
   <!-- Левая карточка (визитка) -->
@@ -550,22 +596,22 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     <h2 class="contacts__title">Связаться в мессенджерах</h2>
 
     <div class="qr-lines">
-      <a class="qr-item" href="https://t.me/stilva_support" target="_blank" rel="noopener">
+      <a class="qr-item" href="https://t.me/<?= h($homeTgHandle) ?>" target="_blank" rel="noopener">
         <img alt="QR Telegram" width="120" height="120"
-             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=https%3A%2F%2Ft.me%2Fstilva_support"/>
+             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=<?= urlencode('https://t.me/'.$homeTgHandle) ?>"/>
         <div class="qr-meta">
           <div class="qr-title">Telegram</div>
-          <div class="qr-sub">@stilva_support</div>
+          <div class="qr-sub">@<?= h($homeTgHandle) ?></div>
           <div class="qr-cta">Открыть чат</div>
         </div>
       </a>
 
-      <a class="qr-item" href="https://wa.me/79000000000?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%2C%20%D1%85%D0%BE%D1%87%D1%83%20%D0%BE%D1%84%D0%BE%D1%80%D0%BC%D0%B8%D1%82%D1%8C%20%D0%B7%D0%B0%D0%BA%D0%B0%D0%B7" target="_blank" rel="noopener">
+      <a class="qr-item" href="https://wa.me/<?= h($homeWaDigits) ?>?text=<?= urlencode('Здравствуйте, хочу оформить заказ') ?>" target="_blank" rel="noopener">
         <img alt="QR WhatsApp" width="120" height="120"
-             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=https%3A%2F%2Fwa.me%2F79000000000%3Ftext%3D%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5"/>
+             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=<?= urlencode('https://wa.me/'.$homeWaDigits.'?text=Здравствуйте, хочу оформить заказ') ?>"/>
         <div class="qr-meta">
           <div class="qr-title">WhatsApp</div>
-          <div class="qr-sub">+7&nbsp;900&nbsp;000-00-00</div>
+          <div class="qr-sub">+<?= h($homeWaDigits) ?></div>
           <div class="qr-cta">Открыть чат</div>
         </div>
       </a>
