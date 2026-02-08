@@ -811,6 +811,12 @@
               <div class="adm-field"><label>WhatsApp: номер</label><input type="text" id="set_home_wa_phone" placeholder="79000000000"></div>
             </div>
           </div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label>SEO-блок: заголовок</label><input type="text" id="set_home_seo_title"></div>
+              <div class="adm-field"><label>SEO-блок: текст (абзацы разделяйте пустой строкой)</label><textarea id="set_home_seo_text" rows="8"></textarea></div>
+            </div>
+          </div>
           <div class="muted">Для списков используйте формат: Заголовок | Текст (одна строка — один элемент).</div>
         </div>
 
@@ -3053,9 +3059,9 @@ async function loadStatsLeft(){
     document.getElementById('set_edi_sender_uid').value = s.edi_sender_uid || '';
     const defaultCanonical = (location && location.origin ? location.origin : 'https://stilva.ru') + '/';
     document.getElementById('set_seo_site_name').value = seo.site_name || 'STILVA';
-    document.getElementById('set_seo_title').value = seo.title || 'STILVA — стеллажи из нержавейки';
-    document.getElementById('set_seo_description').value = seo.description || 'Нержавеющие стеллажи STILVA: аккуратный внешний вид, прочность и удобство обслуживания. Каталог готовых изделий и индивидуальные решения.';
-    document.getElementById('set_seo_keywords').value = seo.keywords || '';
+    document.getElementById('set_seo_title').value = seo.title || 'Нержавеющие стеллажи для кухни, общепита и склада — STILVA';
+    document.getElementById('set_seo_description').value = seo.description || 'Производим и поставляем стеллажи из нержавеющей стали: типовые размеры и изготовление под задачу, варианты полок и конфигураций, расчёт и доставка по России.';
+    document.getElementById('set_seo_keywords').value = seo.keywords || 'стеллажи из нержавеющей стали, нержавеющие стеллажи, стеллажи для кухни, стеллажи для общепита, стеллажи для склада, стеллажи на заказ, производство стеллажей, купить стеллаж нержавейка';
     document.getElementById('set_seo_canonical').value = seo.canonical || defaultCanonical;
     document.getElementById('set_seo_robots').value = seo.robots || 'index,follow';
     document.getElementById('set_seo_og_title').value = seo.og_title || '';
@@ -3069,31 +3075,34 @@ async function loadStatsLeft(){
     document.getElementById('set_seo_yandex_verification').value = seo.yandex_verification || '';
     document.getElementById('set_seo_bing_verification').value = seo.bing_verification || '';
 
-    document.getElementById('set_home_hero_eyebrow').value = home.hero_eyebrow || 'стеллажи из нержавейки';
-    document.getElementById('set_home_hero_title').value = home.hero_title || 'Аккуратное хранение\\nбез компромиссов';
-    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Надёжные и визуально аккуратные решения для кухни, торгового зала, офиса и склада. Спокойно работают годами и сохраняют порядок.';
-    document.getElementById('set_home_hero_cta1_text').value = home.hero_cta1_text || 'Смотреть каталог';
+    document.getElementById('set_home_hero_eyebrow').value = home.hero_eyebrow || 'стеллажи из нержавеющей стали';
+    document.getElementById('set_home_hero_title').value = home.hero_title || 'Надёжные стеллажи\\nдля кухни, общепита и склада';
+    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Производим и поставляем стеллажи из нержавейки: типовые размеры и индивидуальные конфигурации, аккуратный внешний вид и удобная эксплуатация.';
+    document.getElementById('set_home_hero_cta1_text').value = home.hero_cta1_text || 'Каталог';
     document.getElementById('set_home_hero_cta1_link').value = home.hero_cta1_link || '#catalog';
-    document.getElementById('set_home_hero_cta2_text').value = home.hero_cta2_text || 'Характеристики';
-    document.getElementById('set_home_hero_cta2_link').value = home.hero_cta2_link || '#specs';
+    document.getElementById('set_home_hero_cta2_text').value = home.hero_cta2_text || 'Получить расчёт';
+    document.getElementById('set_home_hero_cta2_link').value = home.hero_cta2_link || '#contacts';
 
-    document.getElementById('set_home_benefits_title').value = home.benefits_title || 'Что вы получаете';
-    document.getElementById('set_home_benefits_lead').value = home.benefits_lead || 'Готовые к работе стеллажи с понятными преимуществами — без сюрпризов в эксплуатации.';
-    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Жёсткая геометрия|Полки держат форму под нагрузкой. Конструкция ровная годами.\\nГигиена и быстрый уход|Гладкая обработка, минимум стыков и зазоров.\\nЧистый внешний вид|Аккуратный дизайн уместен в зале и на кухне.';
+    document.getElementById('set_home_benefits_title').value = home.benefits_title || 'Почему STILVA';
+    document.getElementById('set_home_benefits_lead').value = home.benefits_lead || 'Рациональные решения для рабочих зон: от кухни до склада.';
+    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Нержавеющая сталь|Подходит для влажных и санитарных зон, сохраняет внешний вид.\\nГибкие размеры|Типовые решения и изготовление под задачу — под нишу, стены и проходы.\\nУдобная эксплуатация|Лёгкая очистка, аккуратные узлы, понятная сборка.';
 
-    document.getElementById('set_home_specs_title').value = home.specs_title || 'Характеристики';
-    document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Базовые параметры без лишней терминологии.';
-    document.getElementById('set_home_specs_items').value = home.specs_items || 'Материал|Нержавеющая сталь с чистовой обработкой\\nСборка|Сварная или разборная — по месту и задаче\\nОпции|Бортики, колёса, крепёж к стене, регулировка по высоте\\nЭксплуатация|Кухни, торговые залы, офисы, склады\\nНагрузка|До 80–160 кг на полку в зависимости от серии\\nРазмеры|Ширина 60–180, глубина 40–60, высота 160–200 см';
+    document.getElementById('set_home_specs_title').value = home.specs_title || 'Характеристики и комплектации';
+    document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Собираем конфигурацию под задачу и зону эксплуатации.';
+    document.getElementById('set_home_specs_items').value = home.specs_items || 'Полки|Сплошные или перфорированные — под условия хранения.\\nКаркас|Жёсткая геометрия и устойчивость под рабочими нагрузками.\\nРазмеры|Ширина, глубина и высота — в типовом ряду и под заказ.\\nСферы|Кухни, пищевые производства, склады, лаборатории, торговые зоны.\\nСборка|Разборные или сварные исполнения.\\nСроки|Согласуем до запуска работ.';
 
     document.getElementById('set_home_faq_title').value = home.faq_title || 'FAQ';
     document.getElementById('set_home_faq_lead').value = home.faq_lead || 'Коротко на частые вопросы.';
-    document.getElementById('set_home_faq_items').value = home.faq_items || 'Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\\nКак ухаживать?|Нейтральные моющие, без абразива и агрессивной химии.\\nДоставка и монтаж?|Да, условия фиксируем в смете.\\nСроки?|Зависят от конфигурации. Подтверждаем до старта.';
+    document.getElementById('set_home_faq_items').value = home.faq_items || 'Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\\nКакая сталь используется?|Подбираем под задачу. Марку и толщину согласуем перед запуском.\\nСроки изготовления?|Зависят от объёма и конфигурации, фиксируем в смете.\\nДоставка?|Доставка по России, условия согласуем.';
 
     document.getElementById('set_home_contacts_title').value = home.contacts_title || 'Свяжитесь с нами';
     document.getElementById('set_home_contacts_lead').value = home.contacts_lead || 'Подробно осудим все детали и возможные нестандартные решения.';
     document.getElementById('set_home_contacts_note').value = home.contacts_note || '';
     document.getElementById('set_home_tg_handle').value = home.tg_handle || 'stilva_support';
     document.getElementById('set_home_wa_phone').value = home.wa_phone || '79000000000';
+
+    document.getElementById('set_home_seo_title').value = home.seo_title || 'Стеллажи из нержавеющей стали для общепита и производства';
+    document.getElementById('set_home_seo_text').value = home.seo_text || 'STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. В каталоге — типовые размеры, а также изготовление под задачу: под нишу, проходы и планировку цеха.\\n\\nДоступны разные исполнения: варианты полок, количества ярусов и конфигураций. Мы подберём оптимальное решение под условия эксплуатации, нагрузку и требования санитарии.\\n\\nЕсли нужен расчёт — пришлите параметры, мы быстро соберём конфигурацию и стоимость.';
   }
 
   async function saveSettings(){
@@ -3161,7 +3170,9 @@ async function loadStatsLeft(){
         contacts_lead: (document.getElementById('set_home_contacts_lead').value || '').trim(),
         contacts_note: (document.getElementById('set_home_contacts_note').value || '').trim(),
         tg_handle: (document.getElementById('set_home_tg_handle').value || '').trim(),
-        wa_phone: (document.getElementById('set_home_wa_phone').value || '').trim()
+        wa_phone: (document.getElementById('set_home_wa_phone').value || '').trim(),
+        seo_title: (document.getElementById('set_home_seo_title').value || '').trim(),
+        seo_text: (document.getElementById('set_home_seo_text').value || '').trim()
       }
     };
     const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });

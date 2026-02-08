@@ -54,6 +54,19 @@ function render_multiline(string $value): string {
   return nl2br(h($value));
 }
 
+function render_paragraphs(string $value): string {
+  $value = trim($value);
+  if ($value === '') return '';
+  $parts = preg_split('/\\n\\s*\\n/', $value);
+  $html = '';
+  foreach ($parts as $p){
+    $p = trim($p);
+    if ($p === '') continue;
+    $html .= '<p>' . h($p) . '</p>';
+  }
+  return $html;
+}
+
 function parse_pairs(string $raw): array {
   $out = [];
   $lines = preg_split('/\\r\\n|\\r|\\n/', $raw);
@@ -130,27 +143,27 @@ $base = $scheme . '://' . $host . '/';
 $siteName = trim((string)($seo['site_name'] ?? 'STILVA'));
 if ($siteName === '') $siteName = 'STILVA';
 
-$homeHeroEyebrow = trim((string)($home['hero_eyebrow'] ?? 'стеллажи из нержавейки'));
-$homeHeroTitle = trim((string)($home['hero_title'] ?? "Аккуратное хранение\nбез компромиссов"));
-$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Надёжные и визуально аккуратные решения для кухни, торгового зала, офиса и склада. Спокойно работают годами и сохраняют порядок.'));
-$homeHeroCta1Text = trim((string)($home['hero_cta1_text'] ?? 'Смотреть каталог'));
+$homeHeroEyebrow = trim((string)($home['hero_eyebrow'] ?? 'стеллажи из нержавеющей стали'));
+$homeHeroTitle = trim((string)($home['hero_title'] ?? "Надёжные стеллажи\nдля кухни, общепита и склада"));
+$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Производим и поставляем стеллажи из нержавейки: типовые размеры и индивидуальные конфигурации, аккуратный внешний вид и удобная эксплуатация.'));
+$homeHeroCta1Text = trim((string)($home['hero_cta1_text'] ?? 'Каталог'));
 $homeHeroCta1Link = trim((string)($home['hero_cta1_link'] ?? '#catalog'));
-$homeHeroCta2Text = trim((string)($home['hero_cta2_text'] ?? 'Характеристики'));
-$homeHeroCta2Link = trim((string)($home['hero_cta2_link'] ?? '#specs'));
+$homeHeroCta2Text = trim((string)($home['hero_cta2_text'] ?? 'Получить расчёт'));
+$homeHeroCta2Link = trim((string)($home['hero_cta2_link'] ?? '#contacts'));
 
-$homeBenefitsTitle = trim((string)($home['benefits_title'] ?? 'Что вы получаете'));
-$homeBenefitsLead = trim((string)($home['benefits_lead'] ?? 'Готовые к работе стеллажи с понятными преимуществами — без сюрпризов в эксплуатации.'));
-$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Жёсткая геометрия|Полки держат форму под нагрузкой. Конструкция ровная годами.\nГигиена и быстрый уход|Гладкая обработка, минимум стыков и зазоров.\nЧистый внешний вид|Аккуратный дизайн уместен в зале и на кухне."));
+$homeBenefitsTitle = trim((string)($home['benefits_title'] ?? 'Почему STILVA'));
+$homeBenefitsLead = trim((string)($home['benefits_lead'] ?? 'Рациональные решения для рабочих зон: от кухни до склада.'));
+$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Нержавеющая сталь|Подходит для влажных и санитарных зон, сохраняет внешний вид.\nГибкие размеры|Типовые решения и изготовление под задачу — под нишу, стены и проходы.\nУдобная эксплуатация|Лёгкая очистка, аккуратные узлы, понятная сборка."));
 $homeBenefits = parse_pairs($homeBenefitsRaw);
 
-$homeSpecsTitle = trim((string)($home['specs_title'] ?? 'Характеристики'));
-$homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Базовые параметры без лишней терминологии.'));
-$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Материал|Нержавеющая сталь с чистовой обработкой\nСборка|Сварная или разборная — по месту и задаче\nОпции|Бортики, колёса, крепёж к стене, регулировка по высоте\nЭксплуатация|Кухни, торговые залы, офисы, склады\nНагрузка|До 80–160 кг на полку в зависимости от серии\nРазмеры|Ширина 60–180, глубина 40–60, высота 160–200 см"));
+$homeSpecsTitle = trim((string)($home['specs_title'] ?? 'Характеристики и комплектации'));
+$homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Собираем конфигурацию под задачу и зону эксплуатации.'));
+$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Полки|Сплошные или перфорированные — под условия хранения.\nКаркас|Жёсткая геометрия и устойчивость под рабочими нагрузками.\nРазмеры|Ширина, глубина и высота — в типовом ряду и под заказ.\nСферы|Кухни, пищевые производства, склады, лаборатории, торговые зоны.\nСборка|Разборные или сварные исполнения.\nСроки|Согласуем до запуска работ."));
 $homeSpecs = parse_pairs($homeSpecsRaw);
 
 $homeFaqTitle = trim((string)($home['faq_title'] ?? 'FAQ'));
 $homeFaqLead = trim((string)($home['faq_lead'] ?? 'Коротко на частые вопросы.'));
-$homeFaqRaw = trim((string)($home['faq_items'] ?? "Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\nКак ухаживать?|Нейтральные моющие, без абразива и агрессивной химии.\nДоставка и монтаж?|Да, условия фиксируем в смете.\nСроки?|Зависят от конфигурации. Подтверждаем до старта."));
+$homeFaqRaw = trim((string)($home['faq_items'] ?? "Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\nКакая сталь используется?|Подбираем под задачу. Марку и толщину согласуем перед запуском.\nСроки изготовления?|Зависят от объёма и конфигурации, фиксируем в смете.\nДоставка?|Доставка по России, условия согласуем."));
 $homeFaq = parse_pairs($homeFaqRaw);
 
 $homeContactsTitle = trim((string)($home['contacts_title'] ?? 'Свяжитесь с нами'));
@@ -162,15 +175,18 @@ $homeWaPhone = trim((string)($home['wa_phone'] ?? '79000000000'));
 $homeWaDigits = phone_digits($homeWaPhone);
 if ($homeWaDigits === '') $homeWaDigits = '79000000000';
 
-$defaultTitle = 'STILVA — стеллажи из нержавейки';
+$homeSeoTitle = trim((string)($home['seo_title'] ?? 'Стеллажи из нержавеющей стали для общепита и производства'));
+$homeSeoText = trim((string)($home['seo_text'] ?? "STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. В каталоге — типовые размеры, а также изготовление под задачу: под нишу, проходы и планировку цеха.\n\nДоступны разные исполнения: варианты полок, количества ярусов и конфигураций. Мы подберём оптимальное решение под условия эксплуатации, нагрузку и требования санитарии.\n\nЕсли нужен расчёт — пришлите параметры, мы быстро соберём конфигурацию и стоимость."));
+
+$defaultTitle = 'Нержавеющие стеллажи для кухни, общепита и склада — STILVA';
 $title = trim((string)($seo['title'] ?? $defaultTitle));
 if ($title === '') $title = $defaultTitle;
 
-$defaultDesc = 'Нержавеющие стеллажи STILVA: аккуратный внешний вид, прочность и удобство обслуживания. Каталог готовых изделий и индивидуальные решения.';
+$defaultDesc = 'Производим и поставляем стеллажи из нержавеющей стали: типовые размеры и изготовление под задачу, варианты полок и конфигураций, расчёт и доставка по России.';
 $desc = trim((string)($seo['description'] ?? $defaultDesc));
 if ($desc === '') $desc = $defaultDesc;
 
-$keywords = trim((string)($seo['keywords'] ?? ''));
+$keywords = trim((string)($seo['keywords'] ?? 'стеллажи из нержавеющей стали, нержавеющие стеллажи, стеллажи для кухни, стеллажи для общепита, стеллажи для склада, стеллажи на заказ, производство стеллажей, купить стеллаж нержавейка'));
 
 $canonical = trim((string)($seo['canonical'] ?? $base));
 if ($canonical === '') $canonical = $base;
@@ -577,6 +593,16 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <?php endforeach; ?>
 </div>
 </section>
+<?php if ($homeSeoText !== ''): ?>
+<section class="wrap section" id="seo-text">
+<div class="section__head">
+<h2 class="h2"><?= h($homeSeoTitle) ?></h2>
+</div>
+<div class="seo-text">
+<?= render_paragraphs($homeSeoText) ?>
+</div>
+</section>
+<?php endif; ?>
 <section aria-label="Контакты" class="contacts" id="contacts">
 <div class="section__head">
 <h2 class="h2"><?= h($homeContactsTitle) ?></h2>

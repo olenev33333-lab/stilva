@@ -465,3 +465,12 @@ section.contacts {
   outline-offset: 4px;
   box-shadow: 0 10px 30px rgba(15,23,42,.12);
 }
+
+.seo-text{
+  padding-inline: var(--side);
+  color: var(--text);
+}
+.seo-text p{
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+}
