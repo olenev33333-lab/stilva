@@ -525,7 +525,7 @@ function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $ne
     if ($prevStatus === 'Выполнен' && $newStatus !== 'Выполнен'){
       stock_unfulfill_order($pdo, $orderId);
     }
-    $reserveStatuses = ['В работе','Критическое ожидание'];
+    $reserveStatuses = ['В работе','Критическое ожидание','Передан в доставку'];
     if (in_array($newStatus, $reserveStatuses, true)){
       stock_apply_reservation($pdo, $orderId);
     } elseif ($newStatus === 'Выполнен') {
