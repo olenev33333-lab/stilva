@@ -185,8 +185,8 @@ $homeWaPhone = trim((string)($home['wa_phone'] ?? '79000000000'));
 $homeWaDigits = phone_digits($homeWaPhone);
 if ($homeWaDigits === '') $homeWaDigits = '79000000000';
 
-$homeSeoTitle = trim((string)($home['seo_title'] ?? 'Стеллажи из нержавейки для кухни, общепита и склада'));
-$homeSeoText = trim((string)($home['seo_text'] ?? "STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров закрывает большинство задач: ширина 800–1200 мм, глубина 300–600 мм, высота 1800 мм.\n\nПодберём сталь под условия эксплуатации (AISI 304/430), тип полок (перфорированные или сплошные), количество ярусов и исполнение (разборное или сварное).\n\nЕсли нужно нестандартное решение — изготовим под задачу, согласуем сроки и доставку."));
+$homeSeoTitle = trim((string)($home['seo_title'] ?? ''));
+$homeSeoText = trim((string)($home['seo_text'] ?? ''));
 
 $defaultTitle = 'Стеллажи из нержавеющей стали для общепита и склада — STILVA';
 $title = trim((string)($seo['title'] ?? $defaultTitle));
@@ -224,9 +224,6 @@ if ($ogLocale === '') $ogLocale = 'ru_RU';
 $ogImageRaw = trim((string)($seo['og_image'] ?? ''));
 if ($ogImageRaw === '') $ogImageRaw = '/pictures/1000x400x1800.png';
 $ogImage = abs_url($ogImageRaw, $base, $scheme);
-$ogImageAlt = $productView ? trim((string)($productView['name'] ?? '')) : ($siteName.' — стеллажи из нержавеющей стали');
-if ($ogImageAlt === '') $ogImageAlt = $siteName;
-
 $twitterCard = trim((string)($seo['twitter_card'] ?? 'summary_large_image'));
 if ($twitterCard === '') $twitterCard = 'summary_large_image';
 $googleVerify = trim((string)($seo['google_verification'] ?? ''));
@@ -251,6 +248,9 @@ if ($productIdParam > 0 && $products) {
     if ((int)($p['id'] ?? 0) === $productIdParam){ $productView = $p; break; }
   }
 }
+
+$ogImageAlt = $productView ? trim((string)($productView['name'] ?? '')) : ($siteName.' — стеллажи из нержавеющей стали');
+if ($ogImageAlt === '') $ogImageAlt = $siteName;
 
 if ($productView){
   $pName = trim((string)($productView['name'] ?? ''));
