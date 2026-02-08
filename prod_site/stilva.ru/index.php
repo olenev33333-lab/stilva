@@ -144,26 +144,26 @@ $siteName = trim((string)($seo['site_name'] ?? 'STILVA'));
 if ($siteName === '') $siteName = 'STILVA';
 
 $homeHeroEyebrow = trim((string)($home['hero_eyebrow'] ?? 'стеллажи из нержавеющей стали'));
-$homeHeroTitle = trim((string)($home['hero_title'] ?? "Надёжные стеллажи\nдля кухни, общепита и склада"));
-$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Производим и поставляем стеллажи из нержавейки: типовые размеры и индивидуальные конфигурации, аккуратный внешний вид и удобная эксплуатация.'));
+$homeHeroTitle = trim((string)($home['hero_title'] ?? "Стеллажи для кухни,\nобщепита и склада"));
+$homeHeroLead = trim((string)($home['hero_lead'] ?? 'Типовые размеры и изготовление под задачу. Подбор стали AISI 304/430, перфорированные или сплошные полки, аккуратная сборка.'));
 $homeHeroCta1Text = trim((string)($home['hero_cta1_text'] ?? 'Каталог'));
 $homeHeroCta1Link = trim((string)($home['hero_cta1_link'] ?? '#catalog'));
 $homeHeroCta2Text = trim((string)($home['hero_cta2_text'] ?? 'Получить расчёт'));
 $homeHeroCta2Link = trim((string)($home['hero_cta2_link'] ?? '#contacts'));
 
 $homeBenefitsTitle = trim((string)($home['benefits_title'] ?? 'Почему STILVA'));
-$homeBenefitsLead = trim((string)($home['benefits_lead'] ?? 'Рациональные решения для рабочих зон: от кухни до склада.'));
-$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Нержавеющая сталь|Подходит для влажных и санитарных зон, сохраняет внешний вид.\nГибкие размеры|Типовые решения и изготовление под задачу — под нишу, стены и проходы.\nУдобная эксплуатация|Лёгкая очистка, аккуратные узлы, понятная сборка."));
+$homeBenefitsLead = trim((string)($home['benefits_lead'] ?? 'Коммерческий класс для рабочих зон: кухня, общепит, склад.'));
+$homeBenefitsRaw = trim((string)($home['benefits_items'] ?? "Сталь под задачу|Подберём AISI 304/430 под условия эксплуатации.\nКонфигурации|Перфорированные или сплошные полки, нужное количество ярусов.\nТиповые и под заказ|Быстрое решение из каталога или изготовление под нишу."));
 $homeBenefits = parse_pairs($homeBenefitsRaw);
 
-$homeSpecsTitle = trim((string)($home['specs_title'] ?? 'Характеристики и комплектации'));
-$homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Собираем конфигурацию под задачу и зону эксплуатации.'));
-$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Полки|Сплошные или перфорированные — под условия хранения.\nКаркас|Жёсткая геометрия и устойчивость под рабочими нагрузками.\nРазмеры|Ширина, глубина и высота — в типовом ряду и под заказ.\nСферы|Кухни, пищевые производства, склады, лаборатории, торговые зоны.\nСборка|Разборные или сварные исполнения.\nСроки|Согласуем до запуска работ."));
+$homeSpecsTitle = trim((string)($home['specs_title'] ?? 'Характеристики и размеры'));
+$homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Типовой ряд и индивидуальные решения.'));
+$homeSpecsRaw = trim((string)($home['specs_items'] ?? "Полки|Перфорированные или сплошные — под задачу хранения.\nРазмеры|Типовой ряд: ширина 800–1200, глубина 300–600, высота 1800 мм.\nСборка|Разборные или сварные исполнения.\nРегулировка|Возможна настройка уровня полок по высоте.\nОпоры|Регулируемые опоры для ровной установки.\nСроки|Согласуем до старта производства."));
 $homeSpecs = parse_pairs($homeSpecsRaw);
 
 $homeFaqTitle = trim((string)($home['faq_title'] ?? 'FAQ'));
 $homeFaqLead = trim((string)($home['faq_lead'] ?? 'Коротко на частые вопросы.'));
-$homeFaqRaw = trim((string)($home['faq_items'] ?? "Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\nКакая сталь используется?|Подбираем под задачу. Марку и толщину согласуем перед запуском.\nСроки изготовления?|Зависят от объёма и конфигурации, фиксируем в смете.\nДоставка?|Доставка по России, условия согласуем."));
+$homeFaqRaw = trim((string)($home['faq_items'] ?? "Нестандартные размеры?|Да, подгоняем под нишу и планировку цеха.\nКакая сталь используется?|AISI 304/430 — подберём под условия эксплуатации.\nКакие полки доступны?|Перфорированные или сплошные, количество ярусов согласуем.\nДоставка?|Доставка по России, условия и сроки фиксируем."));
 $homeFaq = parse_pairs($homeFaqRaw);
 
 $homeContactsTitle = trim((string)($home['contacts_title'] ?? 'Свяжитесь с нами'));
@@ -175,26 +175,26 @@ $homeWaPhone = trim((string)($home['wa_phone'] ?? '79000000000'));
 $homeWaDigits = phone_digits($homeWaPhone);
 if ($homeWaDigits === '') $homeWaDigits = '79000000000';
 
-$homeSeoTitle = trim((string)($home['seo_title'] ?? 'Стеллажи из нержавеющей стали для общепита и производства'));
-$homeSeoText = trim((string)($home['seo_text'] ?? "STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. В каталоге — типовые размеры, а также изготовление под задачу: под нишу, проходы и планировку цеха.\n\nДоступны разные исполнения: варианты полок, количества ярусов и конфигураций. Мы подберём оптимальное решение под условия эксплуатации, нагрузку и требования санитарии.\n\nЕсли нужен расчёт — пришлите параметры, мы быстро соберём конфигурацию и стоимость."));
+$homeSeoTitle = trim((string)($home['seo_title'] ?? 'Стеллажи из нержавейки для кухни, общепита и склада'));
+$homeSeoText = trim((string)($home['seo_text'] ?? "STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров закрывает большинство задач: ширина 800–1200 мм, глубина 300–600 мм, высота 1800 мм.\n\nПодберём сталь под условия эксплуатации (AISI 304/430), тип полок (перфорированные или сплошные), количество ярусов и исполнение (разборное или сварное).\n\nЕсли нужно нестандартное решение — изготовим под задачу, согласуем сроки и доставку."));
 
-$defaultTitle = 'Нержавеющие стеллажи для кухни, общепита и склада — STILVA';
+$defaultTitle = 'Стеллажи из нержавеющей стали для общепита и склада — STILVA';
 $title = trim((string)($seo['title'] ?? $defaultTitle));
 if ($title === '') $title = $defaultTitle;
 
-$defaultDesc = 'Производим и поставляем стеллажи из нержавеющей стали: типовые размеры и изготовление под задачу, варианты полок и конфигураций, расчёт и доставка по России.';
+$defaultDesc = 'Производим и поставляем стеллажи из нержавейки: типовые размеры и изготовление под задачу, перфорированные и сплошные полки, подбор стали AISI 304/430, расчёт и доставка по России.';
 $desc = trim((string)($seo['description'] ?? $defaultDesc));
 if ($desc === '') $desc = $defaultDesc;
 
-$keywords = trim((string)($seo['keywords'] ?? 'стеллажи из нержавеющей стали, нержавеющие стеллажи, стеллажи для кухни, стеллажи для общепита, стеллажи для склада, стеллажи на заказ, производство стеллажей, купить стеллаж нержавейка'));
+$keywords = trim((string)($seo['keywords'] ?? 'стеллажи из нержавеющей стали, стеллажи из нержавейки, стеллажи для общепита, стеллажи для кухни, стеллажи для склада, стеллажи AISI 304, стеллажи AISI 430, перфорированные полки, производственные стеллажи, стеллажи на заказ, производство стеллажей'));
 
 $canonical = trim((string)($seo['canonical'] ?? $base));
 if ($canonical === '') $canonical = $base;
 $canonical = abs_url($canonical, $base, $scheme);
 $siteUrl = $base;
 
-$robots = trim((string)($seo['robots'] ?? 'index,follow'));
-if ($robots === '') $robots = 'index,follow';
+$robots = trim((string)($seo['robots'] ?? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'));
+if ($robots === '') $robots = 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
 
 $themeColor = trim((string)($seo['theme_color'] ?? '#f7f8fb'));
 if ($themeColor === '') $themeColor = '#f7f8fb';
@@ -214,6 +214,8 @@ if ($ogLocale === '') $ogLocale = 'ru_RU';
 $ogImageRaw = trim((string)($seo['og_image'] ?? ''));
 if ($ogImageRaw === '') $ogImageRaw = '/pictures/1000x400x1800.png';
 $ogImage = abs_url($ogImageRaw, $base, $scheme);
+$ogImageAlt = $productView ? trim((string)($productView['name'] ?? '')) : ($siteName.' — стеллажи из нержавеющей стали');
+if ($ogImageAlt === '') $ogImageAlt = $siteName;
 
 $twitterCard = trim((string)($seo['twitter_card'] ?? 'summary_large_image'));
 if ($twitterCard === '') $twitterCard = 'summary_large_image';
@@ -311,7 +313,7 @@ if ($products){
     $catalogHtml .= '
             <article class="product" data-id="'.(int)$id.'">
               <div class="product__body">
-                <div class="product__title">'.h($titleText).'</div>
+                <div class="product__title"><a class="product__link" href="'.h($siteUrl.'?product='.(int)$id.'#catalog').'">'.h($titleText).'</a></div>
                 <div class="product__status">'.$statusHtml.'</div>
                 <div class="product__price">'.$priceText.'&nbsp;₽</div>
                 <div class="product__tags">'.$tagsHtml.'</div>
@@ -361,7 +363,29 @@ $website = [
   'url' => $siteUrl
 ];
 
+$localBusiness = null;
+if ($contactPhone !== '' || $contactAddress !== '') {
+  $localBusiness = [
+    '@context' => 'https://schema.org',
+    '@type' => 'LocalBusiness',
+    'name' => $siteName,
+    'url' => $siteUrl
+  ];
+  if ($contactPhone !== '') $localBusiness['telephone'] = $contactPhone;
+  if ($contactEmail !== '') $localBusiness['email'] = $contactEmail;
+  if ($contactAddress !== '') {
+    $localBusiness['address'] = [
+      '@type' => 'PostalAddress',
+      'streetAddress' => $contactAddress,
+      'addressCountry' => 'RU'
+    ];
+  }
+  $localBusiness['areaServed'] = 'Россия';
+  $localBusiness['openingHours'] = 'Mo-Fr 10:00-19:00';
+}
+
 $ldObjects = [$org, $website];
+if ($localBusiness) $ldObjects[] = $localBusiness;
 // FAQ structured data
 if ($homeFaq){
   $faq = [
@@ -397,6 +421,12 @@ if ($productView) {
   if ($available > 0) $availability = 'https://schema.org/InStock';
   else if ($mode === 'mto' || $mode === 'mixed' || $onOrder > 0) $availability = 'https://schema.org/PreOrder';
   $img = trim((string)($productView['image_url'] ?? ''));
+  $props = [];
+  if (!empty($productView['material'])) $props[] = ['@type'=>'PropertyValue','name'=>'Материал','value'=>(string)$productView['material']];
+  if (!empty($productView['construction'])) $props[] = ['@type'=>'PropertyValue','name'=>'Конструкция','value'=>(string)$productView['construction']];
+  if (!empty($productView['perforation'])) $props[] = ['@type'=>'PropertyValue','name'=>'Перфорация','value'=>(string)$productView['perforation']];
+  if (!empty($productView['shelf_thickness'])) $props[] = ['@type'=>'PropertyValue','name'=>'Толщина полки','value'=>(string)$productView['shelf_thickness'].' мм'];
+  if (!empty($productView['shelves'])) $props[] = ['@type'=>'PropertyValue','name'=>'Кол-во полок','value'=>(string)$productView['shelves']];
   $productLd = [
     '@context' => 'https://schema.org',
     '@type' => 'Product',
@@ -410,10 +440,23 @@ if ($productView) {
       'url' => $canonical,
       'priceCurrency' => 'RUB',
       'price' => $price > 0 ? number_format($price, 2, '.', '') : '0',
-      'availability' => $availability
+      'availability' => $availability,
+      'itemCondition' => 'https://schema.org/NewCondition',
+      'seller' => [ '@type' => 'Organization', 'name' => $siteName ]
     ]
   ];
+  if ($props) $productLd['additionalProperty'] = $props;
+  if (!empty($productView['material'])) $productLd['material'] = (string)$productView['material'];
   $ldObjects[] = $productLd;
+  $ldObjects[] = [
+    '@context' => 'https://schema.org',
+    '@type' => 'BreadcrumbList',
+    'itemListElement' => [
+      ['@type'=>'ListItem','position'=>1,'name'=>$siteName,'item'=>$siteUrl],
+      ['@type'=>'ListItem','position'=>2,'name'=>'Каталог','item'=>$siteUrl.'#catalog'],
+      ['@type'=>'ListItem','position'=>3,'name'=>trim((string)($productView['name'] ?? '')),'item'=>$canonical],
+    ]
+  ];
 } elseif ($products) {
   $list = [];
   $productList = [];
@@ -440,6 +483,12 @@ if ($productView) {
     if ($available > 0) $availability = 'https://schema.org/InStock';
     else if ($mode === 'mto' || $mode === 'mixed' || $onOrder > 0) $availability = 'https://schema.org/PreOrder';
     $img = trim((string)($p['image_url'] ?? ''));
+    $props = [];
+    if (!empty($p['material'])) $props[] = ['@type'=>'PropertyValue','name'=>'Материал','value'=>(string)$p['material']];
+    if (!empty($p['construction'])) $props[] = ['@type'=>'PropertyValue','name'=>'Конструкция','value'=>(string)$p['construction']];
+    if (!empty($p['perforation'])) $props[] = ['@type'=>'PropertyValue','name'=>'Перфорация','value'=>(string)$p['perforation']];
+    if (!empty($p['shelf_thickness'])) $props[] = ['@type'=>'PropertyValue','name'=>'Толщина полки','value'=>(string)$p['shelf_thickness'].' мм'];
+    if (!empty($p['shelves'])) $props[] = ['@type'=>'PropertyValue','name'=>'Кол-во полок','value'=>(string)$p['shelves']];
     $productList[] = [
       '@context' => 'https://schema.org',
       '@type' => 'Product',
@@ -453,9 +502,13 @@ if ($productView) {
         'url' => $url,
         'priceCurrency' => 'RUB',
         'price' => $price > 0 ? number_format($price, 2, '.', '') : '0',
-        'availability' => $availability
+        'availability' => $availability,
+        'itemCondition' => 'https://schema.org/NewCondition',
+        'seller' => [ '@type' => 'Organization', 'name' => $siteName ]
       ]
     ];
+    if ($props) $productList[count($productList)-1]['additionalProperty'] = $props;
+    if (!empty($p['material'])) $productList[count($productList)-1]['material'] = (string)$p['material'];
   }
   $ldObjects[] = [
     '@context' => 'https://schema.org',
@@ -501,6 +554,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <meta content="<?= h($ogDesc) ?>" property="og:description"/>
 <meta content="<?= h($canonical) ?>" property="og:url"/>
 <meta content="<?= h($ogImage) ?>" property="og:image"/>
+<meta content="<?= h($ogImageAlt) ?>" property="og:image:alt"/>
 <meta content="<?= h($ogType) ?>" property="og:type"/>
 <meta content="<?= h($ogLocale) ?>" property="og:locale"/>
 <?php if ($productView): ?>
@@ -511,6 +565,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <meta content="<?= h($ogTitle) ?>" name="twitter:title"/>
 <meta content="<?= h($ogDesc) ?>" name="twitter:description"/>
 <meta content="<?= h($ogImage) ?>" name="twitter:image"/>
+<meta content="<?= h($ogImageAlt) ?>" name="twitter:image:alt"/>
 <?php if ($ld): ?>
 <script type="application/ld+json"><?= $ld ?></script>
 <?php endif; ?>

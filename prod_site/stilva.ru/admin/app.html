@@ -741,12 +741,7 @@
               <div class="adm-field"><label>Canonical URL</label><input type="text" id="set_seo_canonical" placeholder="https://stilva.ru/"></div>
               <div class="adm-field">
                 <label>Robots</label>
-                <select id="set_seo_robots">
-                  <option value="index,follow">index,follow</option>
-                  <option value="noindex,follow">noindex,follow</option>
-                  <option value="index,nofollow">index,nofollow</option>
-                  <option value="noindex,nofollow">noindex,nofollow</option>
-                </select>
+                <input type="text" id="set_seo_robots" placeholder="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
               </div>
               <div class="adm-field"><label>OG Title</label><input type="text" id="set_seo_og_title"></div>
               <div class="adm-field"><label>OG Description</label><textarea id="set_seo_og_description" rows="2"></textarea></div>
@@ -3059,13 +3054,13 @@ async function loadStatsLeft(){
     document.getElementById('set_edi_sender_uid').value = s.edi_sender_uid || '';
     const defaultCanonical = (location && location.origin ? location.origin : 'https://stilva.ru') + '/';
     document.getElementById('set_seo_site_name').value = seo.site_name || 'STILVA';
-    document.getElementById('set_seo_title').value = seo.title || 'Нержавеющие стеллажи для кухни, общепита и склада — STILVA';
-    document.getElementById('set_seo_description').value = seo.description || 'Производим и поставляем стеллажи из нержавеющей стали: типовые размеры и изготовление под задачу, варианты полок и конфигураций, расчёт и доставка по России.';
-    document.getElementById('set_seo_keywords').value = seo.keywords || 'стеллажи из нержавеющей стали, нержавеющие стеллажи, стеллажи для кухни, стеллажи для общепита, стеллажи для склада, стеллажи на заказ, производство стеллажей, купить стеллаж нержавейка';
+    document.getElementById('set_seo_title').value = seo.title || 'Стеллажи из нержавеющей стали для общепита и склада — STILVA';
+    document.getElementById('set_seo_description').value = seo.description || 'Производим и поставляем стеллажи из нержавейки: типовые размеры и изготовление под задачу, перфорированные и сплошные полки, подбор стали AISI 304/430, расчёт и доставка по России.';
+    document.getElementById('set_seo_keywords').value = seo.keywords || 'стеллажи из нержавеющей стали, стеллажи из нержавейки, стеллажи для общепита, стеллажи для кухни, стеллажи для склада, стеллажи AISI 304, стеллажи AISI 430, перфорированные полки, производственные стеллажи, стеллажи на заказ, производство стеллажей';
     document.getElementById('set_seo_canonical').value = seo.canonical || defaultCanonical;
-    document.getElementById('set_seo_robots').value = seo.robots || 'index,follow';
-    document.getElementById('set_seo_og_title').value = seo.og_title || '';
-    document.getElementById('set_seo_og_description').value = seo.og_description || '';
+    document.getElementById('set_seo_robots').value = seo.robots || 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+    document.getElementById('set_seo_og_title').value = seo.og_title || 'Нержавеющие стеллажи STILVA — кухня, общепит, склад';
+    document.getElementById('set_seo_og_description').value = seo.og_description || 'Стеллажи из нержавеющей стали для кухни, общепита и складов. Типовые размеры и изготовление под задачу, доставка по России.';
     document.getElementById('set_seo_og_image').value = seo.og_image || (defaultCanonical + 'pictures/1000x400x1800.png');
     document.getElementById('set_seo_og_type').value = seo.og_type || 'website';
     document.getElementById('set_seo_og_locale').value = seo.og_locale || 'ru_RU';
@@ -3076,24 +3071,24 @@ async function loadStatsLeft(){
     document.getElementById('set_seo_bing_verification').value = seo.bing_verification || '';
 
     document.getElementById('set_home_hero_eyebrow').value = home.hero_eyebrow || 'стеллажи из нержавеющей стали';
-    document.getElementById('set_home_hero_title').value = home.hero_title || 'Надёжные стеллажи\\nдля кухни, общепита и склада';
-    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Производим и поставляем стеллажи из нержавейки: типовые размеры и индивидуальные конфигурации, аккуратный внешний вид и удобная эксплуатация.';
+    document.getElementById('set_home_hero_title').value = home.hero_title || 'Стеллажи для кухни,\\nобщепита и склада';
+    document.getElementById('set_home_hero_lead').value = home.hero_lead || 'Типовые размеры и изготовление под задачу. Подбор стали AISI 304/430, перфорированные или сплошные полки, аккуратная сборка.';
     document.getElementById('set_home_hero_cta1_text').value = home.hero_cta1_text || 'Каталог';
     document.getElementById('set_home_hero_cta1_link').value = home.hero_cta1_link || '#catalog';
     document.getElementById('set_home_hero_cta2_text').value = home.hero_cta2_text || 'Получить расчёт';
     document.getElementById('set_home_hero_cta2_link').value = home.hero_cta2_link || '#contacts';
 
     document.getElementById('set_home_benefits_title').value = home.benefits_title || 'Почему STILVA';
-    document.getElementById('set_home_benefits_lead').value = home.benefits_lead || 'Рациональные решения для рабочих зон: от кухни до склада.';
-    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Нержавеющая сталь|Подходит для влажных и санитарных зон, сохраняет внешний вид.\\nГибкие размеры|Типовые решения и изготовление под задачу — под нишу, стены и проходы.\\nУдобная эксплуатация|Лёгкая очистка, аккуратные узлы, понятная сборка.';
+    document.getElementById('set_home_benefits_lead').value = home.benefits_lead || 'Коммерческий класс для рабочих зон: кухня, общепит, склад.';
+    document.getElementById('set_home_benefits_items').value = home.benefits_items || 'Сталь под задачу|Подберём AISI 304/430 под условия эксплуатации.\\nКонфигурации|Перфорированные или сплошные полки, нужное количество ярусов.\\nТиповые и под заказ|Быстрое решение из каталога или изготовление под нишу.';
 
-    document.getElementById('set_home_specs_title').value = home.specs_title || 'Характеристики и комплектации';
-    document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Собираем конфигурацию под задачу и зону эксплуатации.';
-    document.getElementById('set_home_specs_items').value = home.specs_items || 'Полки|Сплошные или перфорированные — под условия хранения.\\nКаркас|Жёсткая геометрия и устойчивость под рабочими нагрузками.\\nРазмеры|Ширина, глубина и высота — в типовом ряду и под заказ.\\nСферы|Кухни, пищевые производства, склады, лаборатории, торговые зоны.\\nСборка|Разборные или сварные исполнения.\\nСроки|Согласуем до запуска работ.';
+    document.getElementById('set_home_specs_title').value = home.specs_title || 'Характеристики и размеры';
+    document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Типовой ряд и индивидуальные решения.';
+    document.getElementById('set_home_specs_items').value = home.specs_items || 'Полки|Перфорированные или сплошные — под задачу хранения.\\nРазмеры|Типовой ряд: ширина 800–1200, глубина 300–600, высота 1800 мм.\\nСборка|Разборные или сварные исполнения.\\nРегулировка|Возможна настройка уровня полок по высоте.\\nОпоры|Регулируемые опоры для ровной установки.\\nСроки|Согласуем до старта производства.';
 
     document.getElementById('set_home_faq_title').value = home.faq_title || 'FAQ';
     document.getElementById('set_home_faq_lead').value = home.faq_lead || 'Коротко на частые вопросы.';
-    document.getElementById('set_home_faq_items').value = home.faq_items || 'Нестандартные размеры?|Да. Подгоняем под нишу, углы и высоту потолка.\\nКакая сталь используется?|Подбираем под задачу. Марку и толщину согласуем перед запуском.\\nСроки изготовления?|Зависят от объёма и конфигурации, фиксируем в смете.\\nДоставка?|Доставка по России, условия согласуем.';
+    document.getElementById('set_home_faq_items').value = home.faq_items || 'Нестандартные размеры?|Да, подгоняем под нишу и планировку цеха.\\nКакая сталь используется?|AISI 304/430 — подберём под условия эксплуатации.\\nКакие полки доступны?|Перфорированные или сплошные, количество ярусов согласуем.\\nДоставка?|Доставка по России, условия и сроки фиксируем.';
 
     document.getElementById('set_home_contacts_title').value = home.contacts_title || 'Свяжитесь с нами';
     document.getElementById('set_home_contacts_lead').value = home.contacts_lead || 'Подробно осудим все детали и возможные нестандартные решения.';
@@ -3101,8 +3096,8 @@ async function loadStatsLeft(){
     document.getElementById('set_home_tg_handle').value = home.tg_handle || 'stilva_support';
     document.getElementById('set_home_wa_phone').value = home.wa_phone || '79000000000';
 
-    document.getElementById('set_home_seo_title').value = home.seo_title || 'Стеллажи из нержавеющей стали для общепита и производства';
-    document.getElementById('set_home_seo_text').value = home.seo_text || 'STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. В каталоге — типовые размеры, а также изготовление под задачу: под нишу, проходы и планировку цеха.\\n\\nДоступны разные исполнения: варианты полок, количества ярусов и конфигураций. Мы подберём оптимальное решение под условия эксплуатации, нагрузку и требования санитарии.\\n\\nЕсли нужен расчёт — пришлите параметры, мы быстро соберём конфигурацию и стоимость.';
+    document.getElementById('set_home_seo_title').value = home.seo_title || 'Стеллажи из нержавейки для кухни, общепита и склада';
+    document.getElementById('set_home_seo_text').value = home.seo_text || 'STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров закрывает большинство задач: ширина 800–1200 мм, глубина 300–600 мм, высота 1800 мм.\\n\\nПодберём сталь под условия эксплуатации (AISI 304/430), тип полок (перфорированные или сплошные), количество ярусов и исполнение (разборное или сварное).\\n\\nЕсли нужно нестандартное решение — изготовим под задачу, согласуем сроки и доставку.';
   }
 
   async function saveSettings(){

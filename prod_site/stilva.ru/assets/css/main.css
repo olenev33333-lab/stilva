@@ -474,3 +474,11 @@ section.contacts {
   margin: 0 0 12px 0;
   line-height: 1.6;
 }
+
+.product__link{
+  color: inherit;
+  text-decoration: none;
+}
+.product__link:hover{
+  text-decoration: underline;
+}

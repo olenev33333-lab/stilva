@@ -120,7 +120,7 @@ const imgHtml = p.image_url
           return `
             <article class="product" data-id="${p.id}">
               <div class="product__body">
-                <div class="product__title">${title}</div>
+                <div class="product__title"><a class="product__link" href="?product=${p.id}#catalog">${title}</a></div>
                 <div class="product__status">${statusHtml}</div>
                 <div class="product__price">${price.toLocaleString('ru-RU')}&nbsp;₽</div>
                 <div class="product__tags">

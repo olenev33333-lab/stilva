@@ -20,6 +20,15 @@ function h(string $value): string {
   return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function abs_url(string $url, string $base, string $scheme): string {
+  $url = trim($url);
+  if ($url === '') return '';
+  if (preg_match('~^https?://~i', $url)) return $url;
+  if (strpos($url, '//') === 0) return $scheme . ':' . $url;
+  if ($url[0] === '/') return rtrim($base, '/') . $url;
+  return rtrim($base, '/') . '/' . $url;
+}
+
 $host = $_SERVER['HTTP_HOST'] ?? 'stilva.ru';
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $base = $scheme . '://' . $host . '/';
@@ -35,16 +44,19 @@ $urls[] = [
 
 try {
   $pdo = db();
-  $stmt = $pdo->query("SELECT id FROM products WHERE published = 1 ORDER BY id ASC");
+  $stmt = $pdo->query("SELECT id, image_url FROM products WHERE published = 1 ORDER BY id ASC");
   $rows = $stmt->fetchAll();
   foreach ($rows as $r){
     $id = (int)($r['id'] ?? 0);
     if ($id <= 0) continue;
+    $img = trim((string)($r['image_url'] ?? ''));
+    $img = $img !== '' ? abs_url($img, $base, $scheme) : '';
     $urls[] = [
       'loc' => $base . '?product=' . $id,
       'lastmod' => $today,
       'changefreq' => 'weekly',
-      'priority' => '0.7'
+      'priority' => '0.7',
+      'image' => $img
     ];
   }
 } catch (Throwable $e) {
@@ -53,13 +65,19 @@ try {
 
 echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 ?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 <?php foreach ($urls as $u): ?>
   <url>
     <loc><?= h($u['loc']) ?></loc>
     <lastmod><?= h($u['lastmod']) ?></lastmod>
     <changefreq><?= h($u['changefreq']) ?></changefreq>
     <priority><?= h($u['priority']) ?></priority>
+    <?php if (!empty($u['image'])): ?>
+    <image:image>
+      <image:loc><?= h($u['image']) ?></image:loc>
+    </image:image>
+    <?php endif; ?>
   </url>
 <?php endforeach; ?>
 </urlset>
