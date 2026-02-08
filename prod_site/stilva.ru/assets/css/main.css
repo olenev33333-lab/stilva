@@ -73,8 +73,7 @@
     .hero{ background: transparent; }
     .hero__grid{
   display:grid;
-  /* БЫЛО: grid-template-columns: 1.1fr .9fr; или что-то подобное */
-  grid-template-columns: 1fr clamp(1000px, 48vw, 1000px); /* ← ширина ПОЛЯ тут */
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: clamp(20px, 4vw, 40px);
   align-items:center;
 }
@@ -251,7 +250,7 @@
     .catalog__grid { display:grid; gap: clamp(12px, 1.6vw, 16px); grid-template-columns: repeat(3, minmax(0,1fr)); transition:opacity .2s ease; }
     @media (max-width:1000px){ .catalog__grid { grid-template-columns: 1fr 1fr; } }
     @media (max-width:640px){ .catalog__grid { grid-template-columns: 1fr; } }
-    #catalog[aria-busy="true"] .catalog__grid { opacity:0 }
+    #catalog[aria-busy="true"] .catalog__grid { opacity:.6 }
 
     .product { border:1px solid var(--border); border-radius:16px; overflow:hidden; background: color-mix(in oklab, var(--surface) 35%, transparent);
       display:grid; grid-template-columns: 1.1fr .9fr; align-items:stretch; }
@@ -335,11 +334,20 @@ body::before{
   pointer-events: none;
   background:
     radial-gradient(1400px 1100px at var(--cloud1-x) var(--cloud1-y),
-      color-mix(in oklab, var(--cloud-color) 45%, transparent) 0%, transparent 70%),
+      rgba(107,147,255,0.25) 0%, transparent 70%),
     radial-gradient(1200px 900px at var(--cloud2-x) var(--cloud2-y),
-      color-mix(in oklab, var(--cloud-color) 35%, transparent) 0%, transparent 72%);
+      rgba(107,147,255,0.18) 0%, transparent 72%);
   background-repeat: no-repeat;
   will-change: transform;
+}
+@supports (color: color-mix(in oklab, #000, #fff)) {
+  body::before{
+    background:
+      radial-gradient(1400px 1100px at var(--cloud1-x) var(--cloud1-y),
+        color-mix(in oklab, var(--cloud-color) 45%, transparent) 0%, transparent 70%),
+      radial-gradient(1200px 900px at var(--cloud2-x) var(--cloud2-y),
+        color-mix(in oklab, var(--cloud-color) 35%, transparent) 0%, transparent 72%);
+  }
 }
 /* === END: background cloud layer (fixed pseudo, under all content) === */
 

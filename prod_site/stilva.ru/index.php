@@ -478,6 +478,51 @@ if ($products){
   }
 }
 
+$heroMiniHtml = '';
+if ($products){
+  $slots = [
+    ['left'=>14,'top'=>10,'z'=>2],
+    ['left'=>56,'top'=>12,'z'=>3],
+    ['left'=>18,'top'=>58,'z'=>1],
+    ['left'=>60,'top'=>60,'z'=>4],
+  ];
+  $mini = array_slice($products, 0, 4);
+  $i = 0;
+  foreach ($mini as $p){
+    $id = (int)($p['id'] ?? 0);
+    $titleText = trim((string)($p['name'] ?? 'Товар'));
+    if ($titleText === '') $titleText = 'Товар';
+    $price = (float)($p['price'] ?? 0);
+    $priceText = number_format($price, 0, '.', ' ');
+    $img = trim((string)($p['image_url'] ?? ''));
+    $imgUrl = $img !== '' ? abs_url($img, $base, $scheme) : '';
+    $imgHtml = $imgUrl !== ''
+      ? '<img class="hero-mini__img" src="'.h($imgUrl).'" alt="'.h($titleText).'">'
+      : '<div class="hero-mini__img" aria-hidden="true"></div>';
+
+    $tags = [];
+    if (!empty($p['material'])) $tags[] = 'Материал: '.(string)$p['material'];
+    if (!empty($p['construction'])) $tags[] = 'Конструкция: '.(string)$p['construction'];
+    $tags = array_slice($tags, 0, 2);
+    $tagsHtml = '';
+    foreach ($tags as $t){ $tagsHtml .= '<span class="hero-mini__tag">'.h($t).'</span>'; }
+
+    $pos = $slots[$i] ?? ['left'=>10 + $i*20, 'top'=>10 + $i*20, 'z'=>$i+1];
+    $style = 'left:'.$pos['left'].'%; top:'.$pos['top'].'%; --dx:0px; --dy:0px; --rot:0deg; --z:'.$pos['z'];
+
+    $heroMiniHtml .= '
+  <div class="hero-mini__card" style="'.h($style).'" data-goto="#catalog" data-id="'.(int)$id.'">
+    '.$imgHtml.'
+    <div class="hero-mini__right">
+      <div class="hero-mini__title">'.h($titleText).'</div>
+      <div class="hero-mini__price">'.$priceText.'&nbsp;₽</div>
+      <div class="hero-mini__tags">'.$tagsHtml.'</div>
+    </div>
+  </div>';
+    $i++;
+  }
+}
+
 $org = [
   '@context' => 'https://schema.org',
   '@type' => 'Organization',
@@ -748,7 +793,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <a class="btn btn--ghost" href="<?= h($homeHeroCta2Link) ?>"><?= h($homeHeroCta2Text) ?></a>
 </div>
 </div>
-<div class="hero__media"><div aria-live="polite" class="hero-mini" id="hero-mini"></div></div>
+<div class="hero__media"><div aria-live="polite" class="hero-mini" id="hero-mini"><?php if ($heroMiniHtml !== '') echo $heroMiniHtml; ?></div></div>
 </div>
 </div>
 </section>
@@ -765,7 +810,7 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 </div>
 </section>
 <!-- Catalog -->
-<section aria-busy="true" id="catalog">
+<section id="catalog">
 <div class="section__head">
 <h2 class="h2">Каталог готовых решений</h2>
 <p class="lead">Доверьтесь нашему опыту - ниже представлены самые лучше образцы нашей продукции.</p>
