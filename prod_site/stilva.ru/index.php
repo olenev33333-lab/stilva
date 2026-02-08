@@ -46,15 +46,54 @@ function abs_url(string $url, string $base, string $scheme): string {
   return rtrim($base, '/') . '/' . $url;
 }
 
+function table_exists(PDO $pdo, string $name): bool {
+  $stmt = $pdo->prepare("SHOW TABLES LIKE :t");
+  $stmt->execute([':t'=>$name]);
+  return (bool)$stmt->fetch();
+}
+
 $seo = [];
 $seller = [];
+$products = [];
+$reservedMap = [];
+$onOrderMap = [];
 try {
   $pdo = db();
   $seo = settings_get($pdo, 'seo', []);
   $seller = settings_get($pdo, 'seller', []);
+  try {
+    $stmt = $pdo->query("SELECT id, name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, supply_mode
+                         FROM products WHERE published = 1 ORDER BY id ASC");
+    $products = $stmt->fetchAll();
+  } catch (Throwable $e) {
+    $stmt = $pdo->query("SELECT id, name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty
+                         FROM products WHERE published = 1 ORDER BY id ASC");
+    $products = $stmt->fetchAll();
+    foreach ($products as &$p){ $p['supply_mode'] = 'stock'; }
+    unset($p);
+  }
+  if ($products) {
+    $ids = array_values(array_unique(array_map(fn($p)=>(int)($p['id'] ?? 0), $products)));
+    $ids = array_filter($ids, fn($x)=>$x>0);
+    if ($ids && table_exists($pdo, 'stock_movements')) {
+      $in = implode(',', array_map('intval', $ids));
+      $rows = $pdo->query("SELECT product_id, SUM(CASE WHEN type='reserve' THEN qty WHEN type='release' THEN -qty ELSE 0 END) AS reserved
+                           FROM stock_movements WHERE product_id IN ($in) GROUP BY product_id")->fetchAll();
+      foreach ($rows as $r){ $reservedMap[(int)$r['product_id']] = (int)$r['reserved']; }
+    }
+    if ($ids && table_exists($pdo, 'production_orders')) {
+      $in = implode(',', array_map('intval', $ids));
+      $rows = $pdo->query("SELECT product_id, SUM(qty - qty_done) AS on_order
+                           FROM production_orders WHERE status='open' AND product_id IN ($in) GROUP BY product_id")->fetchAll();
+      foreach ($rows as $r){ $onOrderMap[(int)$r['product_id']] = (int)$r['on_order']; }
+    }
+  }
 } catch (Throwable $e) {
   $seo = [];
   $seller = [];
+  $products = [];
+  $reservedMap = [];
+  $onOrderMap = [];
 }
 
 $host = $_SERVER['HTTP_HOST'] ?? 'stilva.ru';
@@ -77,6 +116,7 @@ $keywords = trim((string)($seo['keywords'] ?? ''));
 $canonical = trim((string)($seo['canonical'] ?? $base));
 if ($canonical === '') $canonical = $base;
 $canonical = abs_url($canonical, $base, $scheme);
+$siteUrl = $base;
 
 $robots = trim((string)($seo['robots'] ?? 'index,follow'));
 if ($robots === '') $robots = 'index,follow';
@@ -103,11 +143,109 @@ $ogImage = abs_url($ogImageRaw, $base, $scheme);
 $twitterCard = trim((string)($seo['twitter_card'] ?? 'summary_large_image'));
 if ($twitterCard === '') $twitterCard = 'summary_large_image';
 
+$productView = null;
+$productIdParam = isset($_GET['product']) ? (int)$_GET['product'] : 0;
+if ($productIdParam > 0 && $products) {
+  foreach ($products as $p){
+    if ((int)($p['id'] ?? 0) === $productIdParam){ $productView = $p; break; }
+  }
+}
+
+if ($productView){
+  $pName = trim((string)($productView['name'] ?? ''));
+  $pDesc = trim((string)($productView['description'] ?? ''));
+  $pMaterial = trim((string)($productView['material'] ?? ''));
+  $pConstruction = trim((string)($productView['construction'] ?? ''));
+  $pPerforation = trim((string)($productView['perforation'] ?? ''));
+  $pShelf = trim((string)($productView['shelf_thickness'] ?? ''));
+  $pShelves = (int)($productView['shelves'] ?? 0);
+  if ($pDesc === '') {
+    $parts = [];
+    if ($pMaterial !== '') $parts[] = 'Материал: '.$pMaterial;
+    if ($pConstruction !== '') $parts[] = 'Конструкция: '.$pConstruction;
+    if ($pPerforation !== '') $parts[] = 'Перфорация: '.$pPerforation;
+    if ($pShelf !== '') $parts[] = 'Толщина: '.$pShelf.' мм';
+    if ($pShelves > 0) $parts[] = 'Полок: '.$pShelves;
+    $pDesc = $parts ? implode('. ', $parts).'.' : $defaultDesc;
+  }
+  if ($pName !== '') {
+    $title = $pName.' — '.$siteName;
+    $desc = $pDesc;
+    $canonical = abs_url($siteUrl.'?product='.$productIdParam, $base, $scheme);
+    $ogTitle = $title;
+    $ogDesc = $desc;
+    $ogType = 'product';
+    $img = trim((string)($productView['image_url'] ?? ''));
+    if ($img !== '') $ogImage = abs_url($img, $base, $scheme);
+  }
+}
+
+$catalogHtml = '';
+if ($products){
+  foreach ($products as $p){
+    $id = (int)($p['id'] ?? 0);
+    $titleText = trim((string)($p['name'] ?? 'Товар'));
+    if ($titleText === '') $titleText = 'Товар';
+    $price = (float)($p['price'] ?? 0);
+    $stock = (int)($p['stock_qty'] ?? 0);
+    $reserved = (int)($reservedMap[$id] ?? 0);
+    $onOrder = (int)($onOrderMap[$id] ?? 0);
+    $available = $stock - $reserved;
+    if ($available < 0) $available = 0;
+    $mode = (string)($p['supply_mode'] ?? 'stock');
+
+    $statusHtml = '';
+    if ($mode === 'mixed') {
+      if ($available > 0) $statusHtml .= '<span class="pill pill--stock">В наличии: '.(int)$available.' шт.</span>';
+      if ($onOrder > 0) $statusHtml .= '<span class="pill pill--order">Под заказ: '.(int)$onOrder.' шт.</span>';
+      if ($statusHtml === '') $statusHtml = '<span class="pill pill--order">Под заказ</span>';
+    } else {
+      if ($available > 0) $statusHtml = '<span class="pill pill--stock">В наличии: '.(int)$available.' шт.</span>';
+      else $statusHtml = '<span class="pill pill--order">Под заказ</span>';
+    }
+
+    $tags = [];
+    if (!empty($p['material'])) $tags[] = 'Материал: '.(string)$p['material'];
+    if (!empty($p['construction'])) $tags[] = 'Конструкция: '.(string)$p['construction'];
+    if (!empty($p['perforation'])) $tags[] = 'Перфорация: '.(string)$p['perforation'];
+    if (!empty($p['shelf_thickness'])) $tags[] = 'Толщ.: '.(string)$p['shelf_thickness'].' мм';
+    if (!empty($p['shelves'])) $tags[] = 'Полок: '.(string)$p['shelves'];
+    $tagsHtml = '';
+    foreach ($tags as $t){ $tagsHtml .= '<span class="tag">'.h($t).'</span>'; }
+
+    $img = trim((string)($p['image_url'] ?? ''));
+    $imgHtml = $img !== ''
+      ? '<img src="'.h($img).'" data-full="'.h($img).'" alt="'.h($titleText).'" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">'
+      : 'Фото изделия';
+
+    $priceText = number_format($price, 0, '.', ' ');
+    $catalogHtml .= '
+            <article class="product" data-id="'.(int)$id.'">
+              <div class="product__body">
+                <div class="product__title">'.h($titleText).'</div>
+                <div class="product__status">'.$statusHtml.'</div>
+                <div class="product__price">'.$priceText.'&nbsp;₽</div>
+                <div class="product__tags">'.$tagsHtml.'</div>
+                <div class="product__actions">
+                  <button class="btn btn--lite"
+                          data-order
+                          data-id="'.(int)$id.'"
+                          data-name="'.h($titleText).'"
+                          data-price="'.h((string)$price).'">
+                    Заказать
+                  </button>
+                </div>
+              </div>
+              <div class="product__img">'.$imgHtml.'</div>
+            </article>';
+  }
+}
+
 $org = [
   '@context' => 'https://schema.org',
   '@type' => 'Organization',
   'name' => $siteName,
-  'url' => $canonical
+  'url' => $siteUrl
 ];
 if (!empty($seller['phone'])) {
   $org['contactPoint'] = [[
@@ -128,10 +266,92 @@ $website = [
   '@context' => 'https://schema.org',
   '@type' => 'WebSite',
   'name' => $siteName,
-  'url' => $canonical
+  'url' => $siteUrl
 ];
 
-$ld = json_encode([$org, $website], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$ldObjects = [$org, $website];
+if ($productView) {
+  $id = (int)($productView['id'] ?? 0);
+  $price = (float)($productView['price'] ?? 0);
+  $stock = (int)($productView['stock_qty'] ?? 0);
+  $reserved = (int)($reservedMap[$id] ?? 0);
+  $onOrder = (int)($onOrderMap[$id] ?? 0);
+  $available = $stock - $reserved;
+  if ($available < 0) $available = 0;
+  $mode = (string)($productView['supply_mode'] ?? 'stock');
+  $availability = 'https://schema.org/OutOfStock';
+  if ($available > 0) $availability = 'https://schema.org/InStock';
+  else if ($mode === 'mto' || $mode === 'mixed' || $onOrder > 0) $availability = 'https://schema.org/PreOrder';
+  $img = trim((string)($productView['image_url'] ?? ''));
+  $productLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Product',
+    'name' => trim((string)($productView['name'] ?? '')),
+    'sku' => (string)$id,
+    'image' => $img !== '' ? abs_url($img, $base, $scheme) : $ogImage,
+    'description' => $desc,
+    'brand' => [ '@type' => 'Brand', 'name' => $siteName ],
+    'offers' => [
+      '@type' => 'Offer',
+      'url' => $canonical,
+      'priceCurrency' => 'RUB',
+      'price' => $price > 0 ? number_format($price, 2, '.', '') : '0',
+      'availability' => $availability
+    ]
+  ];
+  $ldObjects[] = $productLd;
+} elseif ($products) {
+  $list = [];
+  $productList = [];
+  $pos = 1;
+  foreach ($products as $p){
+    $id = (int)($p['id'] ?? 0);
+    $name = trim((string)($p['name'] ?? ''));
+    if ($name === '') $name = 'Товар';
+    $url = abs_url($siteUrl.'?product='.$id, $base, $scheme);
+    $list[] = [
+      '@type' => 'ListItem',
+      'position' => $pos++,
+      'name' => $name,
+      'url' => $url
+    ];
+    $price = (float)($p['price'] ?? 0);
+    $stock = (int)($p['stock_qty'] ?? 0);
+    $reserved = (int)($reservedMap[$id] ?? 0);
+    $onOrder = (int)($onOrderMap[$id] ?? 0);
+    $available = $stock - $reserved;
+    if ($available < 0) $available = 0;
+    $mode = (string)($p['supply_mode'] ?? 'stock');
+    $availability = 'https://schema.org/OutOfStock';
+    if ($available > 0) $availability = 'https://schema.org/InStock';
+    else if ($mode === 'mto' || $mode === 'mixed' || $onOrder > 0) $availability = 'https://schema.org/PreOrder';
+    $img = trim((string)($p['image_url'] ?? ''));
+    $productList[] = [
+      '@context' => 'https://schema.org',
+      '@type' => 'Product',
+      'name' => $name,
+      'sku' => (string)$id,
+      'image' => $img !== '' ? abs_url($img, $base, $scheme) : $ogImage,
+      'description' => trim((string)($p['description'] ?? '')),
+      'brand' => [ '@type' => 'Brand', 'name' => $siteName ],
+      'offers' => [
+        '@type' => 'Offer',
+        'url' => $url,
+        'priceCurrency' => 'RUB',
+        'price' => $price > 0 ? number_format($price, 2, '.', '') : '0',
+        'availability' => $availability
+      ]
+    ];
+  }
+  $ldObjects[] = [
+    '@context' => 'https://schema.org',
+    '@type' => 'ItemList',
+    'itemListElement' => $list
+  ];
+  foreach ($productList as $pl){ $ldObjects[] = $pl; }
+}
+
+$ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 ?>
 <!DOCTYPE html>
 
@@ -148,6 +368,7 @@ $ld = json_encode([$org, $website], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLAS
 <?php endif; ?>
 <meta content="<?= h($robots) ?>" name="robots"/>
 <link href="<?= h($canonical) ?>" rel="canonical"/>
+<link href="/sitemap.php" rel="sitemap" type="application/xml" title="Sitemap"/>
 <link href="<?= h($canonical) ?>" rel="alternate" hreflang="ru-RU"/>
 <meta content="<?= h($siteName) ?>" property="og:site_name"/>
 <meta content="<?= h($ogTitle) ?>" property="og:title"/>
@@ -156,6 +377,10 @@ $ld = json_encode([$org, $website], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLAS
 <meta content="<?= h($ogImage) ?>" property="og:image"/>
 <meta content="<?= h($ogType) ?>" property="og:type"/>
 <meta content="<?= h($ogLocale) ?>" property="og:locale"/>
+<?php if ($productView): ?>
+<meta content="<?= h(number_format((float)($productView['price'] ?? 0), 2, '.', '')) ?>" property="product:price:amount"/>
+<meta content="RUB" property="product:price:currency"/>
+<?php endif; ?>
 <meta content="<?= h($twitterCard) ?>" name="twitter:card"/>
 <meta content="<?= h($ogTitle) ?>" name="twitter:title"/>
 <meta content="<?= h($ogDesc) ?>" name="twitter:description"/>
@@ -215,7 +440,7 @@ $ld = json_encode([$org, $website], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLAS
 <h2 class="h2">Каталог готовых решений</h2>
 <p class="lead">Доверьтесь нашему опыту - ниже представлены самые лучше образцы нашей продукции.</p>
 </div>
-<div class="catalog__grid"><!-- заполняется через JS --></div>
+<div class="catalog__grid"><?php if ($catalogHtml !== '') echo $catalogHtml; ?></div>
 </section>
 <!-- Specs -->
 <section class="wrap section" id="specs">

@@ -64,6 +64,17 @@ document.addEventListener('click', (e)=>{
 }, {passive:true});
 // ====== /FULLSIZE IMAGE VIEWER ======
 
+    function focusProductFromQuery(grid){
+      if (!grid) return;
+      const params = new URLSearchParams(window.location.search);
+      const id = parseInt(params.get('product') || '', 10);
+      if (!id) return;
+      const card = grid.querySelector(`.product[data-id="${id}"]`);
+      if (!card) return;
+      card.classList.add('product--focus');
+      try { card.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(_) {}
+    }
+
     async function renderCatalog(){
       const sect = document.getElementById('catalog');
       const grid = sect && sect.querySelector('.catalog__grid');
@@ -135,6 +146,7 @@ const imgHtml = p.image_url
               <div class="product__img">${imgHtml}</div>
             </article>`;
         }).join('');
+        focusProductFromQuery(grid);
       } catch(_) {
         /* тишина — не драматизируем */
       } finally {
@@ -449,4 +461,3 @@ return `
   if (document.readyState !== 'loading') requestAnimationFrame(step);
   else document.addEventListener('DOMContentLoaded', ()=>requestAnimationFrame(step));
 })();
-

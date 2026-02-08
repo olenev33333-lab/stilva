@@ -458,3 +458,10 @@ section.contacts {
   #contacts .qr-lines{ flex-wrap: wrap; } /* можно в 2 строки, если места мало */
   #contacts .qr-item img{ width: 140px; height: 140px; } /* побольше на мобилке */
 }
+
+/* Фокус карточки при переходе по ?product=ID */
+.product--focus{
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  box-shadow: 0 10px 30px rgba(15,23,42,.12);
+}
