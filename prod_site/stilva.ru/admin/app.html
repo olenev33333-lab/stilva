@@ -1572,6 +1572,10 @@ function openOrderModal(order){
   const consigneeFields = ['o_upd_consignee_name','o_upd_consignee_address'];
   const buyerNameEl = document.getElementById('o_upd_buyer_name');
   const buyerAddrEl = document.getElementById('o_upd_buyer_address');
+  const buyerTypeEl = document.getElementById('o_upd_buyer_type');
+  const buyerInnEl = document.getElementById('o_upd_buyer_inn');
+  const buyerKppEl = document.getElementById('o_upd_buyer_kpp');
+  const buyerOtherEl = document.getElementById('o_upd_buyer_other');
   async function fillShipperFromSettings(force=false){
     const data = await getSettingsCache();
     const s = data && data.seller ? data.seller : {};
@@ -1621,12 +1625,41 @@ function openOrderModal(order){
       }
     });
   }
+  function toggleBuyerType(){
+    const type = buyerTypeEl?.value || 'org';
+    const show = (el, on)=>{ const wrap = el?.closest('.adm-field'); if (wrap) wrap.style.display = on ? '' : 'none'; };
+    const disable = (el, on)=>{ if (el){ el.disabled = !!on; el.style.opacity = on ? '.6' : '1'; } };
+    if (type === 'person'){
+      show(buyerInnEl, false);
+      show(buyerKppEl, false);
+      show(buyerOtherEl, true);
+      disable(buyerInnEl, true);
+      disable(buyerKppEl, true);
+      disable(buyerOtherEl, false);
+    } else if (type === 'ip'){
+      show(buyerInnEl, true);
+      show(buyerKppEl, false);
+      show(buyerOtherEl, false);
+      disable(buyerInnEl, false);
+      disable(buyerKppEl, true);
+      disable(buyerOtherEl, true);
+    } else {
+      show(buyerInnEl, true);
+      show(buyerKppEl, true);
+      show(buyerOtherEl, false);
+      disable(buyerInnEl, false);
+      disable(buyerKppEl, false);
+      disable(buyerOtherEl, true);
+    }
+  }
   shipperSameEl?.addEventListener('change', toggleShipper);
   consigneeSameEl?.addEventListener('change', toggleConsignee);
   buyerNameEl?.addEventListener('input', ()=>{ if (consigneeSameEl?.checked) fillConsigneeFromBuyer(true); });
   buyerAddrEl?.addEventListener('input', ()=>{ if (consigneeSameEl?.checked) fillConsigneeFromBuyer(true); });
+  buyerTypeEl?.addEventListener('change', toggleBuyerType);
   toggleShipper();
   toggleConsignee();
+  toggleBuyerType();
 
   const updCreateBtn = document.getElementById('o_upd_create');
   const updXmlBtn = document.getElementById('o_upd_xml');
@@ -1720,6 +1753,16 @@ async function orderModalSave(){
     upd_signer2_authority: document.getElementById('o_upd_signer2_authority')?.value || '1',
     upd_signer2_date: document.getElementById('o_upd_signer2_date')?.value || ''
   };
+  // sanitize buyer fields by type
+  if (payload.upd_buyer_type === 'person'){
+    payload.upd_buyer_inn = '';
+    payload.upd_buyer_kpp = '';
+  } else if (payload.upd_buyer_type === 'ip'){
+    payload.upd_buyer_kpp = '';
+    payload.upd_buyer_other = '';
+  } else {
+    payload.upd_buyer_other = '';
+  }
   try{
     const res = await api('/api/orders/'+id, { method:'PATCH', body: JSON.stringify(payload) });
     if (!res.ok) throw new Error(await res.text());
