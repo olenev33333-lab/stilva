@@ -99,6 +99,8 @@ const imgHtml = p.image_url
   ? `<img src="${p.image_url}"
           data-full="${p.image_full_url || p.image_url}"
           alt="${title}"
+          loading="lazy"
+          decoding="async"
           style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">`
   : `Фото изделия`;
 

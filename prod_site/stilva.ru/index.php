@@ -46,6 +46,10 @@ function abs_url(string $url, string $base, string $scheme): string {
   return rtrim($base, '/') . '/' . $url;
 }
 
+function phone_digits(string $value): string {
+  return preg_replace('/\\D+/', '', $value) ?? '';
+}
+
 function table_exists(PDO $pdo, string $name): bool {
   $stmt = $pdo->prepare("SHOW TABLES LIKE :t");
   $stmt->execute([':t'=>$name]);
@@ -142,6 +146,20 @@ $ogImage = abs_url($ogImageRaw, $base, $scheme);
 
 $twitterCard = trim((string)($seo['twitter_card'] ?? 'summary_large_image'));
 if ($twitterCard === '') $twitterCard = 'summary_large_image';
+$googleVerify = trim((string)($seo['google_verification'] ?? ''));
+$yandexVerify = trim((string)($seo['yandex_verification'] ?? ''));
+$bingVerify = trim((string)($seo['bing_verification'] ?? ''));
+
+$contactEmail = trim((string)($seller['email'] ?? 'sales@stilva.example'));
+if ($contactEmail === '') $contactEmail = 'sales@stilva.example';
+$contactPhone = trim((string)($seller['phone'] ?? '+7 000 000 00 00'));
+if ($contactPhone === '') $contactPhone = '+7 000 000 00 00';
+$contactPhoneTel = phone_digits($contactPhone);
+if ($contactPhoneTel === '') $contactPhoneTel = '70000000000';
+$contactAddress = trim((string)($seller['address'] ?? ''));
+$contactNote = $contactAddress !== ''
+  ? 'Пн–пт 10:00–19:00 • '.$contactAddress.' • Работаем по всей России'
+  : 'Пн–пт 10:00–19:00 • Москва • Работаем по всей России';
 
 $productView = null;
 $productIdParam = isset($_GET['product']) ? (int)$_GET['product'] : 0;
@@ -254,6 +272,9 @@ if (!empty($seller['phone'])) {
     'contactType' => 'customer service'
   ]];
 }
+if (!empty($seller['email'])) {
+  $org['email'] = trim((string)$seller['email']);
+}
 if (!empty($seller['address'])) {
   $org['address'] = [
     '@type' => 'PostalAddress',
@@ -270,6 +291,34 @@ $website = [
 ];
 
 $ldObjects = [$org, $website];
+// FAQ structured data
+$faqItems = [
+  ['q'=>'Нестандартные размеры?', 'a'=>'Да. Подгоняем под нишу, углы и высоту потолка.'],
+  ['q'=>'Как ухаживать?', 'a'=>'Нейтральные моющие, без абразива и агрессивной химии.'],
+  ['q'=>'Доставка и монтаж?', 'a'=>'Да, условия фиксируем в смете.'],
+  ['q'=>'Сроки?', 'a'=>'Зависят от конфигурации. Подтверждаем до старта.']
+];
+if ($faqItems){
+  $faq = [
+    '@context' => 'https://schema.org',
+    '@type' => 'FAQPage',
+    'mainEntity' => []
+  ];
+  foreach ($faqItems as $f){
+    $q = trim((string)($f['q'] ?? ''));
+    $a = trim((string)($f['a'] ?? ''));
+    if ($q === '' || $a === '') continue;
+    $faq['mainEntity'][] = [
+      '@type' => 'Question',
+      'name' => $q,
+      'acceptedAnswer' => [
+        '@type' => 'Answer',
+        'text' => $a
+      ]
+    ];
+  }
+  if (!empty($faq['mainEntity'])) $ldObjects[] = $faq;
+}
 if ($productView) {
   $id = (int)($productView['id'] ?? 0);
   $price = (float)($productView['price'] ?? 0);
@@ -370,6 +419,18 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <link href="<?= h($canonical) ?>" rel="canonical"/>
 <link href="/sitemap.php" rel="sitemap" type="application/xml" title="Sitemap"/>
 <link href="<?= h($canonical) ?>" rel="alternate" hreflang="ru-RU"/>
+<link href="<?= h($canonical) ?>" rel="alternate" hreflang="x-default"/>
+<?php if ($googleVerify !== ''): ?>
+<meta content="<?= h($googleVerify) ?>" name="google-site-verification"/>
+<?php endif; ?>
+<?php if ($yandexVerify !== ''): ?>
+<meta content="<?= h($yandexVerify) ?>" name="yandex-verification"/>
+<?php endif; ?>
+<?php if ($bingVerify !== ''): ?>
+<meta content="<?= h($bingVerify) ?>" name="msvalidate.01"/>
+<?php endif; ?>
+<link href="/favicon.svg" rel="icon" type="image/svg+xml"/>
+<link href="/favicon.ico" rel="icon" sizes="any"/>
 <meta content="<?= h($siteName) ?>" property="og:site_name"/>
 <meta content="<?= h($ogTitle) ?>" property="og:title"/>
 <meta content="<?= h($ogDesc) ?>" property="og:description"/>
@@ -479,9 +540,9 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
   <!-- Левая карточка (визитка) -->
   <div class="contacts__card contacts__card--center">
     <h2 class="contacts__title">Контакты</h2>
-    <p class="contacts__row"><strong>Email:</strong> <a href="mailto:sales@stilva.example">sales@stilva.example</a></p>
-    <p class="contacts__row"><strong>Телефон:</strong> <a href="tel:+7-000-000-00-00">+7&nbsp;000&nbsp;000&nbsp;00&nbsp;00</a></p>
-    <p class="contacts__note">Пн–пт 10:00–19:00 • Москва • Работаем по всей России</p>
+    <p class="contacts__row"><strong>Email:</strong> <a href="mailto:<?= h($contactEmail) ?>"><?= h($contactEmail) ?></a></p>
+    <p class="contacts__row"><strong>Телефон:</strong> <a href="tel:+<?= h($contactPhoneTel) ?>"><?= h($contactPhone) ?></a></p>
+    <p class="contacts__note"><?= h($contactNote) ?></p>
   </div>
 
   <!-- Правая карточка (мессенджеры c QR) -->
@@ -518,8 +579,8 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <footer class="wrap" id="contacts" style="border-top:1px solid var(--border);padding:24px var(--side) 40px;color:var(--muted);font-size:14px">
 <div><strong>STILVA</strong> • Производство и поставка стеллажей из нержавеющей стали</div>
 <div style="margin-top:6px">
-<a href="mailto:sales@stilva.example">sales@stilva.example</a> •
-      <a href="tel:+7-000-000-00-00">+7 000 000 00 00</a>
+<a href="mailto:<?= h($contactEmail) ?>"><?= h($contactEmail) ?></a> •
+      <a href="tel:+<?= h($contactPhoneTel) ?>"><?= h($contactPhone) ?></a>
 </div>
 <div style="margin-top:6px">ИНН / ОГРН — по запросу • © 2025 STILVA</div>
 </footer>

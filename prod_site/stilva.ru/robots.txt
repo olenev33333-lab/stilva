@@ -3,4 +3,5 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 Disallow: /uploads/
+Host: stilva.ru
 Sitemap: https://stilva.ru/sitemap.php

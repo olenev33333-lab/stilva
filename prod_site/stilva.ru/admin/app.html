@@ -768,6 +768,9 @@
                 </select>
               </div>
               <div class="adm-field"><label>Theme color</label><input type="text" id="set_seo_theme_color" placeholder="#f7f8fb"></div>
+              <div class="adm-field"><label>Google verification</label><input type="text" id="set_seo_google_verification" placeholder="xxxxxxxxxxxxxxxxxx"></div>
+              <div class="adm-field"><label>Yandex verification</label><input type="text" id="set_seo_yandex_verification" placeholder="xxxxxxxxxxxxxxxxxx"></div>
+              <div class="adm-field"><label>Bing verification</label><input type="text" id="set_seo_bing_verification" placeholder="xxxxxxxxxxxxxxxxxx"></div>
             </div>
           </div>
           <div class="muted">Если поля OG и Twitter пустые — используются Title/Description. URL лучше задавать абсолютные.</div>
@@ -3023,6 +3026,9 @@ async function loadStatsLeft(){
     document.getElementById('set_seo_og_locale').value = seo.og_locale || 'ru_RU';
     document.getElementById('set_seo_twitter_card').value = seo.twitter_card || 'summary_large_image';
     document.getElementById('set_seo_theme_color').value = seo.theme_color || '#f7f8fb';
+    document.getElementById('set_seo_google_verification').value = seo.google_verification || '';
+    document.getElementById('set_seo_yandex_verification').value = seo.yandex_verification || '';
+    document.getElementById('set_seo_bing_verification').value = seo.bing_verification || '';
   }
 
   async function saveSettings(){
@@ -3064,7 +3070,10 @@ async function loadStatsLeft(){
         og_type: (document.getElementById('set_seo_og_type').value || '').trim(),
         og_locale: (document.getElementById('set_seo_og_locale').value || '').trim(),
         twitter_card: (document.getElementById('set_seo_twitter_card').value || '').trim(),
-        theme_color: (document.getElementById('set_seo_theme_color').value || '').trim()
+        theme_color: (document.getElementById('set_seo_theme_color').value || '').trim(),
+        google_verification: (document.getElementById('set_seo_google_verification').value || '').trim(),
+        yandex_verification: (document.getElementById('set_seo_yandex_verification').value || '').trim(),
+        bing_verification: (document.getElementById('set_seo_bing_verification').value || '').trim()
       }
     };
     const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });
