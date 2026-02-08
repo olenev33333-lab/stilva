@@ -728,6 +728,51 @@
           <div class="muted">Если не используете ЭДО — оставьте код «000», GUID сформируется автоматически.</div>
         </div>
 
+        <div class="order-section">
+          <div class="list-title">Настройки сайта (SEO)</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label>Название сайта</label><input type="text" id="set_seo_site_name" placeholder="STILVA"></div>
+              <div class="adm-field"><label>Title</label><input type="text" id="set_seo_title"></div>
+              <div class="adm-field"><label>Description</label><textarea id="set_seo_description" rows="3"></textarea></div>
+              <div class="adm-field"><label>Keywords</label><textarea id="set_seo_keywords" rows="2"></textarea></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Canonical URL</label><input type="text" id="set_seo_canonical" placeholder="https://stilva.ru/"></div>
+              <div class="adm-field">
+                <label>Robots</label>
+                <select id="set_seo_robots">
+                  <option value="index,follow">index,follow</option>
+                  <option value="noindex,follow">noindex,follow</option>
+                  <option value="index,nofollow">index,nofollow</option>
+                  <option value="noindex,nofollow">noindex,nofollow</option>
+                </select>
+              </div>
+              <div class="adm-field"><label>OG Title</label><input type="text" id="set_seo_og_title"></div>
+              <div class="adm-field"><label>OG Description</label><textarea id="set_seo_og_description" rows="2"></textarea></div>
+              <div class="adm-field"><label>OG Image URL</label><input type="text" id="set_seo_og_image" placeholder="https://stilva.ru/pictures/1000x400x1800.png"></div>
+              <div class="adm-field">
+                <label>OG Type</label>
+                <select id="set_seo_og_type">
+                  <option value="website">website</option>
+                  <option value="product">product</option>
+                  <option value="article">article</option>
+                </select>
+              </div>
+              <div class="adm-field"><label>OG Locale</label><input type="text" id="set_seo_og_locale" placeholder="ru_RU"></div>
+              <div class="adm-field">
+                <label>Twitter card</label>
+                <select id="set_seo_twitter_card">
+                  <option value="summary_large_image">summary_large_image</option>
+                  <option value="summary">summary</option>
+                </select>
+              </div>
+              <div class="adm-field"><label>Theme color</label><input type="text" id="set_seo_theme_color" placeholder="#f7f8fb"></div>
+            </div>
+          </div>
+          <div class="muted">Если поля OG и Twitter пустые — используются Title/Description. URL лучше задавать абсолютные.</div>
+        </div>
+
         <div class="adm-actions">
           <button class="adm-btn adm-btn--accent" id="settings-save">Сохранить</button>
           <button class="adm-btn adm-btn--ghost" id="settings-cancel">Закрыть</button>
@@ -2944,6 +2989,7 @@ async function loadStatsLeft(){
     const res = await api('/api/settings');
     const data = res.ok ? await res.json() : {};
     const s = data.seller || {};
+    const seo = data.seo || {};
     document.getElementById('set_seller_type').value = s.type || 'org';
     document.getElementById('set_seller_name').value = s.name || s.fio || '';
     document.getElementById('set_seller_inn').value = s.inn || '';
@@ -2963,6 +3009,20 @@ async function loadStatsLeft(){
     document.getElementById('set_basis_name').value = s.basis_name || 'Заказ';
     document.getElementById('set_edi_operator').value = s.edi_operator || '000';
     document.getElementById('set_edi_sender_uid').value = s.edi_sender_uid || '';
+    const defaultCanonical = (location && location.origin ? location.origin : 'https://stilva.ru') + '/';
+    document.getElementById('set_seo_site_name').value = seo.site_name || 'STILVA';
+    document.getElementById('set_seo_title').value = seo.title || 'STILVA — стеллажи из нержавейки';
+    document.getElementById('set_seo_description').value = seo.description || 'Нержавеющие стеллажи STILVA: аккуратный внешний вид, прочность и удобство обслуживания. Каталог готовых изделий и индивидуальные решения.';
+    document.getElementById('set_seo_keywords').value = seo.keywords || '';
+    document.getElementById('set_seo_canonical').value = seo.canonical || defaultCanonical;
+    document.getElementById('set_seo_robots').value = seo.robots || 'index,follow';
+    document.getElementById('set_seo_og_title').value = seo.og_title || '';
+    document.getElementById('set_seo_og_description').value = seo.og_description || '';
+    document.getElementById('set_seo_og_image').value = seo.og_image || (defaultCanonical + 'pictures/1000x400x1800.png');
+    document.getElementById('set_seo_og_type').value = seo.og_type || 'website';
+    document.getElementById('set_seo_og_locale').value = seo.og_locale || 'ru_RU';
+    document.getElementById('set_seo_twitter_card').value = seo.twitter_card || 'summary_large_image';
+    document.getElementById('set_seo_theme_color').value = seo.theme_color || '#f7f8fb';
   }
 
   async function saveSettings(){
@@ -2990,6 +3050,21 @@ async function loadStatsLeft(){
         basis_name: (document.getElementById('set_basis_name').value || '').trim(),
         edi_operator: (document.getElementById('set_edi_operator').value || '000').trim(),
         edi_sender_uid: (document.getElementById('set_edi_sender_uid').value || '').trim()
+      },
+      seo: {
+        site_name: (document.getElementById('set_seo_site_name').value || '').trim(),
+        title: (document.getElementById('set_seo_title').value || '').trim(),
+        description: (document.getElementById('set_seo_description').value || '').trim(),
+        keywords: (document.getElementById('set_seo_keywords').value || '').trim(),
+        canonical: (document.getElementById('set_seo_canonical').value || '').trim(),
+        robots: (document.getElementById('set_seo_robots').value || '').trim(),
+        og_title: (document.getElementById('set_seo_og_title').value || '').trim(),
+        og_description: (document.getElementById('set_seo_og_description').value || '').trim(),
+        og_image: (document.getElementById('set_seo_og_image').value || '').trim(),
+        og_type: (document.getElementById('set_seo_og_type').value || '').trim(),
+        og_locale: (document.getElementById('set_seo_og_locale').value || '').trim(),
+        twitter_card: (document.getElementById('set_seo_twitter_card').value || '').trim(),
+        theme_color: (document.getElementById('set_seo_theme_color').value || '').trim()
       }
     };
     const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });

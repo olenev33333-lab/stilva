@@ -1,0 +1,348 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/api/config.php';
+
+function db(): PDO {
+  static $pdo = null;
+  if ($pdo) return $pdo;
+  $cfg = $GLOBALS['__DB_CFG'];
+  $dsn = "mysql:host={$cfg['host']};dbname={$cfg['name']};charset=utf8mb4";
+  $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+  ]);
+  return $pdo;
+}
+
+function settings_bootstrap(PDO $pdo){
+  $pdo->exec("CREATE TABLE IF NOT EXISTS app_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    k VARCHAR(64) NOT NULL UNIQUE,
+    v MEDIUMTEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function settings_get(PDO $pdo, string $key, $default=null){
+  settings_bootstrap($pdo);
+  $stmt = $pdo->prepare("SELECT v FROM app_settings WHERE k = :k");
+  $stmt->execute([':k'=>$key]);
+  $row = $stmt->fetch();
+  if (!$row) return $default;
+  $val = json_decode((string)$row['v'], true);
+  return $val !== null ? $val : $row['v'];
+}
+
+function h(string $value): string {
+  return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function abs_url(string $url, string $base, string $scheme): string {
+  $url = trim($url);
+  if ($url === '') return '';
+  if (preg_match('~^https?://~i', $url)) return $url;
+  if (strpos($url, '//') === 0) return $scheme . ':' . $url;
+  if ($url[0] === '/') return rtrim($base, '/') . $url;
+  return rtrim($base, '/') . '/' . $url;
+}
+
+$seo = [];
+$seller = [];
+try {
+  $pdo = db();
+  $seo = settings_get($pdo, 'seo', []);
+  $seller = settings_get($pdo, 'seller', []);
+} catch (Throwable $e) {
+  $seo = [];
+  $seller = [];
+}
+
+$host = $_SERVER['HTTP_HOST'] ?? 'stilva.ru';
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$base = $scheme . '://' . $host . '/';
+
+$siteName = trim((string)($seo['site_name'] ?? 'STILVA'));
+if ($siteName === '') $siteName = 'STILVA';
+
+$defaultTitle = 'STILVA — стеллажи из нержавейки';
+$title = trim((string)($seo['title'] ?? $defaultTitle));
+if ($title === '') $title = $defaultTitle;
+
+$defaultDesc = 'Нержавеющие стеллажи STILVA: аккуратный внешний вид, прочность и удобство обслуживания. Каталог готовых изделий и индивидуальные решения.';
+$desc = trim((string)($seo['description'] ?? $defaultDesc));
+if ($desc === '') $desc = $defaultDesc;
+
+$keywords = trim((string)($seo['keywords'] ?? ''));
+
+$canonical = trim((string)($seo['canonical'] ?? $base));
+if ($canonical === '') $canonical = $base;
+$canonical = abs_url($canonical, $base, $scheme);
+
+$robots = trim((string)($seo['robots'] ?? 'index,follow'));
+if ($robots === '') $robots = 'index,follow';
+
+$themeColor = trim((string)($seo['theme_color'] ?? '#f7f8fb'));
+if ($themeColor === '') $themeColor = '#f7f8fb';
+
+$ogTitle = trim((string)($seo['og_title'] ?? $title));
+if ($ogTitle === '') $ogTitle = $title;
+
+$ogDesc = trim((string)($seo['og_description'] ?? $desc));
+if ($ogDesc === '') $ogDesc = $desc;
+
+$ogType = trim((string)($seo['og_type'] ?? 'website'));
+if ($ogType === '') $ogType = 'website';
+
+$ogLocale = trim((string)($seo['og_locale'] ?? 'ru_RU'));
+if ($ogLocale === '') $ogLocale = 'ru_RU';
+
+$ogImageRaw = trim((string)($seo['og_image'] ?? ''));
+if ($ogImageRaw === '') $ogImageRaw = '/pictures/1000x400x1800.png';
+$ogImage = abs_url($ogImageRaw, $base, $scheme);
+
+$twitterCard = trim((string)($seo['twitter_card'] ?? 'summary_large_image'));
+if ($twitterCard === '') $twitterCard = 'summary_large_image';
+
+$org = [
+  '@context' => 'https://schema.org',
+  '@type' => 'Organization',
+  'name' => $siteName,
+  'url' => $canonical
+];
+if (!empty($seller['phone'])) {
+  $org['contactPoint'] = [[
+    '@type' => 'ContactPoint',
+    'telephone' => trim((string)$seller['phone']),
+    'contactType' => 'customer service'
+  ]];
+}
+if (!empty($seller['address'])) {
+  $org['address'] = [
+    '@type' => 'PostalAddress',
+    'streetAddress' => trim((string)$seller['address'])
+  ];
+}
+if ($ogImage !== '') $org['logo'] = $ogImage;
+
+$website = [
+  '@context' => 'https://schema.org',
+  '@type' => 'WebSite',
+  'name' => $siteName,
+  'url' => $canonical
+];
+
+$ld = json_encode([$org, $website], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+?>
+<!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="light" name="color-scheme"/>
+<meta content="<?= h($themeColor) ?>" name="theme-color"/>
+<title><?= h($title) ?></title>
+<meta content="<?= h($desc) ?>" name="description"/>
+<?php if ($keywords !== ''): ?>
+<meta content="<?= h($keywords) ?>" name="keywords"/>
+<?php endif; ?>
+<meta content="<?= h($robots) ?>" name="robots"/>
+<link href="<?= h($canonical) ?>" rel="canonical"/>
+<link href="<?= h($canonical) ?>" rel="alternate" hreflang="ru-RU"/>
+<meta content="<?= h($siteName) ?>" property="og:site_name"/>
+<meta content="<?= h($ogTitle) ?>" property="og:title"/>
+<meta content="<?= h($ogDesc) ?>" property="og:description"/>
+<meta content="<?= h($canonical) ?>" property="og:url"/>
+<meta content="<?= h($ogImage) ?>" property="og:image"/>
+<meta content="<?= h($ogType) ?>" property="og:type"/>
+<meta content="<?= h($ogLocale) ?>" property="og:locale"/>
+<meta content="<?= h($twitterCard) ?>" name="twitter:card"/>
+<meta content="<?= h($ogTitle) ?>" name="twitter:title"/>
+<meta content="<?= h($ogDesc) ?>" name="twitter:description"/>
+<meta content="<?= h($ogImage) ?>" name="twitter:image"/>
+<?php if ($ld): ?>
+<script type="application/ld+json"><?= $ld ?></script>
+<?php endif; ?>
+<link href="assets/css/main.css" rel="stylesheet"/>
+</head>
+<body>
+<!-- Header -->
+<div class="wrap header">
+<div class="header__row">
+<div class="brand">STILVA</div>
+<nav aria-label="Навигация" class="nav">
+<a href="#benefits">Плюсы</a>
+<a href="#catalog">Каталог</a>
+<a href="#specs">Характеристики</a>
+<a href="#faq">FAQ</a>
+<a href="#contacts">Контакты</a>
+</nav>
+<div class="hdr-cta"><a class="btn" href="#catalog">Каталог</a></div>
+</div>
+</div>
+<!-- Hero -->
+<section class="wrap hero section">
+<div class="inner">
+<div class="hero__grid">
+<div>
+<span class="eyebrow">стеллажи из нержавейки</span>
+<h1>Аккуратное хранение <br/>без компромиссов</h1>
+<p>Надёжные и визуально аккуратные решения для кухни, торгового зала, офиса и склада. Спокойно работают годами и сохраняют порядок.</p>
+<div class="cta-row">
+<a class="btn" href="#catalog">Смотреть каталог</a>
+<a class="btn btn--ghost" href="#specs">Характеристики</a>
+</div>
+</div>
+<div class="hero__media"><div aria-live="polite" class="hero-mini" id="hero-mini"></div></div>
+</div>
+</div>
+</section>
+<!-- WHAT YOU GET -->
+<section class="wrap section" id="benefits">
+<div class="section__head">
+<h2 class="h2">Что вы получаете</h2>
+<p class="lead">Готовые к работе стеллажи с понятными преимуществами — без сюрпризов в эксплуатации.</p>
+</div>
+<div class="catalog__grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-inline:var(--side)">
+<div class="product"><div class="product__body"><div class="product__title">Жёсткая геометрия</div><div class="product__meta">Полки держат форму под нагрузкой. Конструкция ровная годами.</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Гигиена и быстрый уход</div><div class="product__meta">Гладкая обработка, минимум стыков и зазоров.</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Чистый внешний вид</div><div class="product__meta">Аккуратный дизайн уместен в зале и на кухне.</div></div></div>
+</div>
+</section>
+<!-- Catalog -->
+<section aria-busy="true" id="catalog">
+<div class="section__head">
+<h2 class="h2">Каталог готовых решений</h2>
+<p class="lead">Доверьтесь нашему опыту - ниже представлены самые лучше образцы нашей продукции.</p>
+</div>
+<div class="catalog__grid"><!-- заполняется через JS --></div>
+</section>
+<!-- Specs -->
+<section class="wrap section" id="specs">
+<div class="section__head">
+<h2 class="h2">Характеристики</h2>
+<p class="lead">Базовые параметры без лишней терминологии.</p>
+</div>
+<div class="catalog__grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-inline:var(--side)">
+<div class="product"><div class="product__body"><div class="product__title">Материал</div><div class="product__meta">Нержавеющая сталь с чистовой обработкой</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Сборка</div><div class="product__meta">Сварная или разборная — по месту и задаче</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Опции</div><div class="product__meta">Бортики, колёса, крепёж к стене, регулировка по высоте</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Эксплуатация</div><div class="product__meta">Кухни, торговые залы, офисы, склады</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Нагрузка</div><div class="product__meta">До 80–160 кг на полку в зависимости от серии</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Размеры</div><div class="product__meta">Ширина 60–180, глубина 40–60, высота 160–200 см</div></div></div>
+</div>
+</section>
+<!-- FAQ -->
+<section class="wrap section" id="faq">
+<div class="section__head">
+<h2 class="h2">FAQ</h2>
+<p class="lead">Коротко на частые вопросы.</p>
+</div>
+<div class="catalog__grid" style="grid-template-columns:1fr 1fr;gap:16px;padding-inline:var(--side)">
+<div class="product"><div class="product__body"><div class="product__title">Нестандартные размеры?</div><div class="product__meta">Да. Подгоняем под нишу, углы и высоту потолка.</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Как ухаживать?</div><div class="product__meta">Нейтральные моющие, без абразива и агрессивной химии.</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Доставка и монтаж?</div><div class="product__meta">Да, условия фиксируем в смете.</div></div></div>
+<div class="product"><div class="product__body"><div class="product__title">Сроки?</div><div class="product__meta">Зависят от конфигурации. Подтверждаем до старта.</div></div></div>
+</div>
+</section>
+<section aria-label="Контакты" class="contacts" id="contacts">
+<div class="section__head">
+<h2 class="h2">Свяжитесь с нами</h2>
+<p class="lead">Подробно осудим все детали и возможные нестандартные решения.</p>
+</div>
+<div class="contacts__grid">
+  <!-- Левая карточка (визитка) -->
+  <div class="contacts__card contacts__card--center">
+    <h2 class="contacts__title">Контакты</h2>
+    <p class="contacts__row"><strong>Email:</strong> <a href="mailto:sales@stilva.example">sales@stilva.example</a></p>
+    <p class="contacts__row"><strong>Телефон:</strong> <a href="tel:+7-000-000-00-00">+7&nbsp;000&nbsp;000&nbsp;00&nbsp;00</a></p>
+    <p class="contacts__note">Пн–пт 10:00–19:00 • Москва • Работаем по всей России</p>
+  </div>
+
+  <!-- Правая карточка (мессенджеры c QR) -->
+  <div class="contacts__card contacts__card--center">
+    <h2 class="contacts__title">Связаться в мессенджерах</h2>
+
+    <div class="qr-lines">
+      <a class="qr-item" href="https://t.me/stilva_support" target="_blank" rel="noopener">
+        <img alt="QR Telegram" width="120" height="120"
+             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=https%3A%2F%2Ft.me%2Fstilva_support"/>
+        <div class="qr-meta">
+          <div class="qr-title">Telegram</div>
+          <div class="qr-sub">@stilva_support</div>
+          <div class="qr-cta">Открыть чат</div>
+        </div>
+      </a>
+
+      <a class="qr-item" href="https://wa.me/79000000000?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%2C%20%D1%85%D0%BE%D1%87%D1%83%20%D0%BE%D1%84%D0%BE%D1%80%D0%BC%D0%B8%D1%82%D1%8C%20%D0%B7%D0%B0%D0%BA%D0%B0%D0%B7" target="_blank" rel="noopener">
+        <img alt="QR WhatsApp" width="120" height="120"
+             src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=https%3A%2F%2Fwa.me%2F79000000000%3Ftext%3D%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5"/>
+        <div class="qr-meta">
+          <div class="qr-title">WhatsApp</div>
+          <div class="qr-sub">+7&nbsp;900&nbsp;000-00-00</div>
+          <div class="qr-cta">Открыть чат</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="qr-hint">Сканируйте камерой телефона или нажмите, если вы за компьютером.</div>
+  </div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="wrap" id="contacts" style="border-top:1px solid var(--border);padding:24px var(--side) 40px;color:var(--muted);font-size:14px">
+<div><strong>STILVA</strong> • Производство и поставка стеллажей из нержавеющей стали</div>
+<div style="margin-top:6px">
+<a href="mailto:sales@stilva.example">sales@stilva.example</a> •
+      <a href="tel:+7-000-000-00-00">+7 000 000 00 00</a>
+</div>
+<div style="margin-top:6px">ИНН / ОГРН — по запросу • © 2025 STILVA</div>
+</footer>
+<!-- Бейдж корзины -->
+<button id="cart-badge" style="position:fixed;right:20px;bottom:20px;z-index:9999;background:#111;color:#fff;padding:10px 14px;border-radius:12px;border:none;cursor:pointer">
+    Корзина: <span id="cart-count">0</span>
+</button>
+<!-- Панель заказа -->
+<aside aria-label="Ваш заказ" id="order-panel" style="display:none;position:fixed;right:14px;top:0;height:100%;width:380px;max-width:95vw;
+           background:#fff;border-radius:12px 0 0 12px;
+           box-shadow:-20px 0 40px rgba(0,0,0,.25);z-index:9998;padding:16px;overflow:auto">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+<strong>Ваш заказ</strong>
+<button id="order-close" style="border:none;background:#eee;border-radius:8px;padding:6px 10px;cursor:pointer">✕</button>
+</div>
+<div id="cart-lines" style="display:grid;gap:8px;margin-bottom:12px;"></div>
+<div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin:12px 0;">
+<span>Итого:</span><span><span id="cart-total">0.00</span> ₽</span>
+</div>
+<form id="checkout-form" style="display:grid;gap:8px">
+<input name="name" placeholder="Ваше имя" style="padding:10px;border:1px solid #ddd;border-radius:8px"/>
+<input name="phone" placeholder="Телефон" style="padding:10px;border:1px solid #ddd;border-radius:8px"/>
+<input name="email" placeholder="Email" style="padding:10px;border:1px solid #ddd;border-radius:8px"/>
+<textarea name="note" placeholder="Пожелания" rows="3" style="padding:10px;border:1px solid #ddd;border-radius:8px"></textarea>
+<button id="order-submit" style="width:100%;background:#15803d;color:#fff;border:none;border-radius:10px;
+                     padding:14px 16px;font-weight:700;cursor:pointer">
+        Отправить заказ
+      </button>
+<!-- строка прогресса -->
+<div id="order-progress" style="display:none;align-items:center;gap:8px;margin-top:8px;color:#15803d">
+<span class="spinner"></span>
+<span>Отправляем заказ…</span>
+</div>
+<!-- успех и ошибка -->
+<div id="order-success" style="display:none;margin-top:8px;color:#166534"></div>
+<div id="order-error" style="display:none;margin-top:8px;color:#b91c1c"></div>
+</form>
+</aside>
+<!-- Корзина/каталог -->
+<script src="/js/app.js"></script>
+<!-- Рендер каталога и связь с корзиной (кнопки «Заказать») -->
+<!--Инлайновый скрипт #2 перенесён в assets/js/inline.js -->
+<!--Инлайновый скрипт #3 перенесён в assets/js/inline.js -->
+<!-- mini-cards gentle motion -->
+<!--Инлайновый скрипт #4 перенесён в assets/js/inline.js -->
+<!-- Инлайновый скрипт #5 перенесён в assets/js/inline.js -->
+<!-- BEGIN: background cloud animator -->
+<!--Инлайновый скрипт #6 перенесён в assets/js/inline.js -->
+<!-- END: background cloud animator -->
+<script defer="True" src="assets/js/inline.js"></script></body>
+</html>
