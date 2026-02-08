@@ -161,6 +161,16 @@ $homeSpecsLead = trim((string)($home['specs_lead'] ?? 'Типовой ряд и 
 $homeSpecsRaw = trim((string)($home['specs_items'] ?? "Полки|Перфорированные или сплошные — под задачу хранения.\nРазмеры|Типовой ряд: ширина 800–1200, глубина 300–600, высота 1800 мм.\nСборка|Разборные или сварные исполнения.\nРегулировка|Возможна настройка уровня полок по высоте.\nОпоры|Регулируемые опоры для ровной установки.\nСроки|Согласуем до старта производства."));
 $homeSpecs = parse_pairs($homeSpecsRaw);
 
+$homeCasesTitle = trim((string)($home['cases_title'] ?? 'Сферы применения'));
+$homeCasesLead = trim((string)($home['cases_lead'] ?? 'Решения под рабочие зоны и санитарные требования.'));
+$homeCasesRaw = trim((string)($home['cases_items'] ?? "Общепит и рестораны|Для хранения инвентаря, посуды и продуктов, легко моется.\nКухни и производства|Нержавейка выдерживает влажность и санитарную обработку.\nСклады и логистика|Удобная компоновка рядов и доступ к товару.\nТорговые залы|Аккуратный внешний вид и устойчивость.\nЛаборатории|Чистая обработка и минимум стыков."));
+$homeCases = parse_pairs($homeCasesRaw);
+
+$homeTypesTitle = trim((string)($home['types_title'] ?? 'Типы стеллажей'));
+$homeTypesLead = trim((string)($home['types_lead'] ?? 'Подбираем конструкцию под задачу и условия эксплуатации.'));
+$homeTypesRaw = trim((string)($home['types_items'] ?? "Кухонные стеллажи|Для рабочих зон и хранения на кухне.\nСкладские стеллажи|Для влажных и пищевых складов.\nПроизводственные|Для цехов и линий.\nПерфорированные полки|Вентиляция и стек.\nСплошные полки|Для мелких предметов.\nПод заказ|Нестандартные размеры и конфигурации."));
+$homeTypes = parse_pairs($homeTypesRaw);
+
 $homeFaqTitle = trim((string)($home['faq_title'] ?? 'FAQ'));
 $homeFaqLead = trim((string)($home['faq_lead'] ?? 'Коротко на частые вопросы.'));
 $homeFaqRaw = trim((string)($home['faq_items'] ?? "Нестандартные размеры?|Да, подгоняем под нишу и планировку цеха.\nКакая сталь используется?|AISI 304/430 — подберём под условия эксплуатации.\nКакие полки доступны?|Перфорированные или сплошные, количество ярусов согласуем.\nДоставка?|Доставка по России, условия и сроки фиксируем."));
@@ -636,6 +646,32 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <?php endforeach; ?>
 </div>
 </section>
+<?php if ($homeCases): ?>
+<section class="wrap section" id="cases">
+<div class="section__head">
+<h2 class="h2"><?= h($homeCasesTitle) ?></h2>
+<p class="lead"><?= h($homeCasesLead) ?></p>
+</div>
+<div class="catalog__grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-inline:var(--side)">
+<?php foreach ($homeCases as $it): ?>
+<div class="product"><div class="product__body"><div class="product__title"><?= h($it['title']) ?></div><div class="product__meta"><?= h($it['text']) ?></div></div></div>
+<?php endforeach; ?>
+</div>
+</section>
+<?php endif; ?>
+<?php if ($homeTypes): ?>
+<section class="wrap section" id="types">
+<div class="section__head">
+<h2 class="h2"><?= h($homeTypesTitle) ?></h2>
+<p class="lead"><?= h($homeTypesLead) ?></p>
+</div>
+<div class="catalog__grid" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding-inline:var(--side)">
+<?php foreach ($homeTypes as $it): ?>
+<div class="product"><div class="product__body"><div class="product__title"><?= h($it['title']) ?></div><div class="product__meta"><?= h($it['text']) ?></div></div></div>
+<?php endforeach; ?>
+</div>
+</section>
+<?php endif; ?>
 <!-- FAQ -->
 <section class="wrap section" id="faq">
 <div class="section__head">

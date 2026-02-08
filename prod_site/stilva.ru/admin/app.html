@@ -794,6 +794,18 @@
           </div>
           <div class="adm-grid">
             <div class="adm-col">
+              <div class="adm-field"><label>Сферы применения: заголовок</label><input type="text" id="set_home_cases_title"></div>
+              <div class="adm-field"><label>Сферы применения: лид</label><textarea id="set_home_cases_lead" rows="2"></textarea></div>
+              <div class="adm-field"><label>Сферы применения (строки: Заголовок | Текст)</label><textarea id="set_home_cases_items" rows="6"></textarea></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Типы стеллажей: заголовок</label><input type="text" id="set_home_types_title"></div>
+              <div class="adm-field"><label>Типы стеллажей: лид</label><textarea id="set_home_types_lead" rows="2"></textarea></div>
+              <div class="adm-field"><label>Типы стеллажей (строки: Заголовок | Текст)</label><textarea id="set_home_types_items" rows="6"></textarea></div>
+            </div>
+          </div>
+          <div class="adm-grid">
+            <div class="adm-col">
               <div class="adm-field"><label>FAQ: заголовок</label><input type="text" id="set_home_faq_title"></div>
               <div class="adm-field"><label>FAQ: лид</label><textarea id="set_home_faq_lead" rows="2"></textarea></div>
               <div class="adm-field"><label>FAQ (строки: Вопрос | Ответ)</label><textarea id="set_home_faq_items" rows="6"></textarea></div>
@@ -3086,6 +3098,14 @@ async function loadStatsLeft(){
     document.getElementById('set_home_specs_lead').value = home.specs_lead || 'Типовой ряд и индивидуальные решения.';
     document.getElementById('set_home_specs_items').value = home.specs_items || 'Полки|Перфорированные или сплошные — под задачу хранения.\\nРазмеры|Типовой ряд: ширина 800–1200, глубина 300–600, высота 1800 мм.\\nСборка|Разборные или сварные исполнения.\\nРегулировка|Возможна настройка уровня полок по высоте.\\nОпоры|Регулируемые опоры для ровной установки.\\nСроки|Согласуем до старта производства.';
 
+    document.getElementById('set_home_cases_title').value = home.cases_title || 'Сферы применения';
+    document.getElementById('set_home_cases_lead').value = home.cases_lead || 'Решения под рабочие зоны и санитарные требования.';
+    document.getElementById('set_home_cases_items').value = home.cases_items || 'Общепит и рестораны|Для хранения инвентаря, посуды и продуктов, легко моется.\\nКухни и производства|Нержавейка выдерживает влажность и санитарную обработку.\\nСклады и логистика|Удобная компоновка рядов и доступ к товару.\\nТорговые залы|Аккуратный внешний вид и устойчивость.\\nЛаборатории|Чистая обработка и минимум стыков.';
+
+    document.getElementById('set_home_types_title').value = home.types_title || 'Типы стеллажей';
+    document.getElementById('set_home_types_lead').value = home.types_lead || 'Подбираем конструкцию под задачу и условия эксплуатации.';
+    document.getElementById('set_home_types_items').value = home.types_items || 'Кухонные стеллажи|Для рабочих зон и хранения на кухне.\\nСкладские стеллажи|Для влажных и пищевых складов.\\nПроизводственные|Для цехов и линий.\\nПерфорированные полки|Вентиляция и стек.\\nСплошные полки|Для мелких предметов.\\nПод заказ|Нестандартные размеры и конфигурации.';
+
     document.getElementById('set_home_faq_title').value = home.faq_title || 'FAQ';
     document.getElementById('set_home_faq_lead').value = home.faq_lead || 'Коротко на частые вопросы.';
     document.getElementById('set_home_faq_items').value = home.faq_items || 'Нестандартные размеры?|Да, подгоняем под нишу и планировку цеха.\\nКакая сталь используется?|AISI 304/430 — подберём под условия эксплуатации.\\nКакие полки доступны?|Перфорированные или сплошные, количество ярусов согласуем.\\nДоставка?|Доставка по России, условия и сроки фиксируем.';
@@ -3158,6 +3178,12 @@ async function loadStatsLeft(){
         specs_title: (document.getElementById('set_home_specs_title').value || '').trim(),
         specs_lead: (document.getElementById('set_home_specs_lead').value || '').trim(),
         specs_items: (document.getElementById('set_home_specs_items').value || '').trim(),
+        cases_title: (document.getElementById('set_home_cases_title').value || '').trim(),
+        cases_lead: (document.getElementById('set_home_cases_lead').value || '').trim(),
+        cases_items: (document.getElementById('set_home_cases_items').value || '').trim(),
+        types_title: (document.getElementById('set_home_types_title').value || '').trim(),
+        types_lead: (document.getElementById('set_home_types_lead').value || '').trim(),
+        types_items: (document.getElementById('set_home_types_items').value || '').trim(),
         faq_title: (document.getElementById('set_home_faq_title').value || '').trim(),
         faq_lead: (document.getElementById('set_home_faq_lead').value || '').trim(),
         faq_items: (document.getElementById('set_home_faq_items').value || '').trim(),
