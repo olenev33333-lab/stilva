@@ -373,6 +373,21 @@ $website = [
   'url' => $siteUrl
 ];
 
+$webPage = [
+  '@context' => 'https://schema.org',
+  '@type' => 'WebPage',
+  '@id' => $canonical,
+  'url' => $canonical,
+  'name' => $title,
+  'description' => $desc
+];
+if ($ogImage !== '') {
+  $webPage['primaryImageOfPage'] = [
+    '@type' => 'ImageObject',
+    'url' => $ogImage
+  ];
+}
+
 $localBusiness = null;
 if ($contactPhone !== '' || $contactAddress !== '') {
   $localBusiness = [
@@ -394,7 +409,7 @@ if ($contactPhone !== '' || $contactAddress !== '') {
   $localBusiness['openingHours'] = 'Mo-Fr 10:00-19:00';
 }
 
-$ldObjects = [$org, $website];
+$ldObjects = [$org, $website, $webPage];
 if ($localBusiness) $ldObjects[] = $localBusiness;
 // FAQ structured data
 if ($homeFaq){
@@ -568,8 +583,10 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <meta content="<?= h($ogType) ?>" property="og:type"/>
 <meta content="<?= h($ogLocale) ?>" property="og:locale"/>
 <?php if ($productView): ?>
+<?php if ($productView): ?>
 <meta content="<?= h(number_format((float)($productView['price'] ?? 0), 2, '.', '')) ?>" property="product:price:amount"/>
 <meta content="RUB" property="product:price:currency"/>
+<?php endif; ?>
 <?php endif; ?>
 <meta content="<?= h($twitterCard) ?>" name="twitter:card"/>
 <meta content="<?= h($ogTitle) ?>" name="twitter:title"/>
