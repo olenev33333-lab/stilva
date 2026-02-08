@@ -3364,6 +3364,32 @@ async function loadStatsLeft(){
 
   /* === Intercept status change for "Отменен" === */
   (function(){
+    function showRollbackModal(selectEl, orderId, newStatus, onConfirm){
+      const backdrop = document.getElementById('rollback-modal-backdrop');
+      const msg = document.getElementById('rollback-modal-text');
+      const btnYes = document.getElementById('rollback-modal-yes');
+      const btnNo = document.getElementById('rollback-modal-no');
+      const btnX = document.getElementById('rollback-modal-close');
+
+      function cleanup(){ backdrop.style.display='none'; btnYes.onclick = btnNo.onclick = btnX.onclick = backdrop.onclick = null; }
+      function revert(){
+        cleanup();
+        const prev = selectEl.dataset.prev || 'Выполнен';
+        selectEl.value = prev;
+        applyRowStatusClass(selectEl.closest('tr'), prev);
+      }
+
+      msg.textContent = `Вы меняете статус с «Выполнен» на «${newStatus}». Будет выполнен откат: проводка ДДС аннулируется, складские остатки будут возвращены (и при необходимости перерезервированы). Продолжить?`;
+      backdrop.style.display='flex';
+      btnNo.onclick = revert;
+      btnX.onclick = revert;
+      backdrop.onclick = (ev)=>{ if(ev.target===backdrop) revert(); };
+      btnYes.onclick = async ()=>{
+        cleanup();
+        await onConfirm();
+      };
+    }
+
     function showCancelModal(selectEl, orderId){
       const backdrop = document.getElementById('cancel-modal-backdrop');
       const txt = document.getElementById('cancel-reason');
@@ -3407,6 +3433,31 @@ async function loadStatsLeft(){
       const val = sel.value;
       const prev = sel.dataset.prev || '';
 
+      if(prev === 'Выполнен' && val !== 'Выполнен'){
+        e.stopImmediatePropagation(); e.stopPropagation(); e.preventDefault();
+        showRollbackModal(sel, orderId, val, async ()=>{
+          if (val === 'Отменен'){
+            showCancelModal(sel, orderId);
+            return;
+          }
+          await withOverlay(sel, async ()=>{
+            const resp = await api('/api/orders/'+orderId+'/status',{method:'PATCH', body: JSON.stringify({ status: val })});
+            if (!resp.ok){
+              sel.value = prev;
+              applyRowStatusClass(sel.closest('tr'), prev);
+              return;
+            }
+            const idx = ordersCache.findIndex(x=>String(x.id)===String(orderId));
+            if(idx>-1) ordersCache[idx].status = val;
+            sel.dataset.prev = val;
+            applyRowStatusClass(sel.closest('tr'), val);
+            ddsRefreshOpen();
+            stockRefreshOpen();
+          });
+        });
+        return;
+      }
+
       if(val === 'Отменен'){
         e.stopImmediatePropagation(); e.stopPropagation(); e.preventDefault();
         showCancelModal(sel, orderId);
@@ -3440,6 +3491,22 @@ async function loadStatsLeft(){
   })();
 
 </script>
+
+<div class="modal-backdrop" id="rollback-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rollback-modal-title" style="width:min(720px,96vw)">
+    <div class="modal-head">
+      <h3 id="rollback-modal-title" class="card-title" style="margin:0">Подтверждение отката</h3>
+      <button class="close-x" id="rollback-modal-close">✕</button>
+    </div>
+    <div style="padding:12px;display:grid;gap:12px">
+      <div id="rollback-modal-text" class="muted"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="ghost" id="rollback-modal-no">Нет</button>
+        <button id="rollback-modal-yes">Да, откатить</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="cancel-modal-backdrop" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title">

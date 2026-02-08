@@ -492,8 +492,39 @@ function stock_fulfill_order(PDO $pdo, int $orderId){
       ->execute([':oid'=>$orderId]);
 }
 
+function stock_unfulfill_order(PDO $pdo, int $orderId){
+  stock_bootstrap($pdo);
+  // сколько реально списано (out) минус уже откаты (in)
+  $stmt = $pdo->prepare("SELECT product_id,
+    SUM(CASE WHEN type='out' THEN qty WHEN type='in' THEN -qty ELSE 0 END) AS net_qty
+    FROM stock_movements
+    WHERE order_id = :oid AND reason = 'order' AND type IN ('out','in')
+    GROUP BY product_id");
+  $stmt->execute([':oid'=>$orderId]);
+  $rows = $stmt->fetchAll();
+  foreach ($rows as $r){
+    $pid = (int)($r['product_id'] ?? 0);
+    $net = (int)($r['net_qty'] ?? 0);
+    if ($pid <= 0 || $net <= 0) continue;
+    $pdo->prepare("UPDATE products SET stock_qty = stock_qty + :q WHERE id = :id")
+        ->execute([':q'=>$net, ':id'=>$pid]);
+    stock_insert_movement($pdo, [
+      'product_id'=>$pid,
+      'qty'=>$net,
+      'type'=>'in',
+      'reason'=>'order',
+      'order_id'=>$orderId,
+      'comment'=>'Откат выполнения заказа #'.$orderId,
+    ]);
+  }
+}
+
 function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newStatus){
   try {
+    if ($prevStatus === $newStatus) return;
+    if ($prevStatus === 'Выполнен' && $newStatus !== 'Выполнен'){
+      stock_unfulfill_order($pdo, $orderId);
+    }
     $reserveStatuses = ['В работе','Критическое ожидание'];
     if (in_array($newStatus, $reserveStatuses, true)){
       stock_apply_reservation($pdo, $orderId);
