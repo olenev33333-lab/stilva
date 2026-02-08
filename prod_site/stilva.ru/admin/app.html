@@ -1683,6 +1683,8 @@ function openOrderModal(order){
 
   updCreateBtn?.addEventListener('click', async (e)=>{
     e.preventDefault();
+    const ok = await orderModalSave(true);
+    if (!ok) return;
     const doc = await updCreateForOrder(order.id);
     if (!doc) return;
     orderModalContent.dataset.updId = String(doc.id);
@@ -1707,9 +1709,9 @@ function openOrderModal(order){
   document.getElementById('order-save')?.addEventListener('click', orderModalSave);
   orderModalBackdrop.style.display='flex';
 }
-async function orderModalSave(){
+async function orderModalSave(silent=false){
   const id = orderModalContent.dataset.id;
-  if (!id) return;
+  if (!id) return false;
   const payload = {
     customer_name: (document.getElementById('o_customer_name')?.value || '').trim(),
     phone: (document.getElementById('o_phone')?.value || '').trim(),
@@ -1785,9 +1787,11 @@ async function orderModalSave(){
         if (updStatusEl) updStatusEl.textContent = 'УПД не создан';
       }
     }
+    return true;
   }catch(err){
     console.error(err);
-    alert('Не удалось сохранить заказ');
+    if (!silent) alert('Не удалось сохранить заказ');
+    return false;
   }
 }
 function closeOrderModal(){ orderModalBackdrop.style.display='none'; orderModalContent.innerHTML=''; }
