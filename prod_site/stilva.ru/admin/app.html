@@ -823,9 +823,6 @@
               <div class="adm-field"><label>SEO-блок: заголовок</label><input type="text" id="set_home_seo_title"></div>
               <div class="adm-field"><label>SEO-блок: текст (абзацы разделяйте пустой строкой)</label><textarea id="set_home_seo_text" rows="8"></textarea></div>
             </div>
-            <div class="adm-col">
-              <div class="adm-field"><label>Посадочные страницы (строки: slug | Title | Description | H1 | Lead | SEO Text)</label><textarea id="set_home_landing_items" rows="8"></textarea></div>
-            </div>
           </div>
           <div class="muted">Для списков используйте формат: Заголовок | Текст (одна строка — один элемент).</div>
         </div>
@@ -3121,7 +3118,6 @@ async function loadStatsLeft(){
 
     document.getElementById('set_home_seo_title').value = home.seo_title || 'Стеллажи из нержавейки для кухни, общепита и склада';
     document.getElementById('set_home_seo_text').value = home.seo_text || 'STILVA производит и поставляет стеллажи из нержавеющей стали для кухни, общепита, пищевых производств и складов. Типовой ряд размеров закрывает большинство задач: ширина 800–1200 мм, глубина 300–600 мм, высота 1800 мм.\\n\\nПодберём сталь под условия эксплуатации (AISI 304/430), тип полок (перфорированные или сплошные), количество ярусов и исполнение (разборное или сварное).\\n\\nЕсли нужно нестандартное решение — изготовим под задачу, согласуем сроки и доставку.';
-    document.getElementById('set_home_landing_items').value = home.landing_items || '';
   }
 
   async function saveSettings(){
@@ -3197,8 +3193,7 @@ async function loadStatsLeft(){
         tg_handle: (document.getElementById('set_home_tg_handle').value || '').trim(),
         wa_phone: (document.getElementById('set_home_wa_phone').value || '').trim(),
         seo_title: (document.getElementById('set_home_seo_title').value || '').trim(),
-        seo_text: (document.getElementById('set_home_seo_text').value || '').trim(),
-        landing_items: (document.getElementById('set_home_landing_items').value || '').trim()
+        seo_text: (document.getElementById('set_home_seo_text').value || '').trim()
       }
     };
     const res = await api('/api/settings', { method:'POST', body: JSON.stringify(payload) });
