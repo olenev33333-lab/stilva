@@ -2041,7 +2041,9 @@ try {
       if ($from){ $conds[] = "created_at >= :from"; $args[':from'] = $from.' 00:00:00'; }
       if ($to){   $conds[] = "created_at <= :to";   $args[':to']   = $to.' 23:59:59'; }
       $where = $conds ? ('WHERE '.implode(' AND ', $conds)) : '';
-      $rows = db()->query("SELECT id, customer_name, phone, email, total, created_at FROM orders $where")->fetchAll();
+      $stmt = $pdo->prepare("SELECT id, customer_name, phone, email, total, created_at FROM orders $where");
+      $stmt->execute($args);
+      $rows = $stmt->fetchAll();
       $map = [];
       foreach ($rows as $o){
         $key = trim(($o['phone'] ?? '').$o['email'].$o['customer_name']);
