@@ -482,3 +482,11 @@ section.contacts {
 .product__link:hover{
   text-decoration: underline;
 }
+
+.catalog-links{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding-inline: var(--side);
+  margin-bottom: 14px;
+}

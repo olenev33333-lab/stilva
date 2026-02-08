@@ -83,6 +83,40 @@ function parse_pairs(string $raw): array {
   return $out;
 }
 
+function slugify_ru(string $value): string {
+  $value = trim(mb_strtolower($value, 'UTF-8'));
+  $map = [
+    'а'=>'a','б'=>'b','в'=>'v','г'=>'g','д'=>'d','е'=>'e','ё'=>'e','ж'=>'zh','з'=>'z','и'=>'i','й'=>'y',
+    'к'=>'k','л'=>'l','м'=>'m','н'=>'n','о'=>'o','п'=>'p','р'=>'r','с'=>'s','т'=>'t','у'=>'u','ф'=>'f',
+    'х'=>'h','ц'=>'c','ч'=>'ch','ш'=>'sh','щ'=>'sch','ъ'=>'','ы'=>'y','ь'=>'','э'=>'e','ю'=>'yu','я'=>'ya'
+  ];
+  $value = strtr($value, $map);
+  $value = preg_replace('/[^a-z0-9]+/i', '-', $value) ?? '';
+  $value = trim($value, '-');
+  return $value;
+}
+
+function parse_landing_overrides(string $raw): array {
+  $out = [];
+  $lines = preg_split('/\\r\\n|\\r|\\n/', $raw);
+  foreach ($lines as $line){
+    $line = trim($line);
+    if ($line === '') continue;
+    $parts = array_map('trim', explode('|', $line));
+    if (count($parts) < 5) continue;
+    $slug = $parts[0] ?? '';
+    if ($slug === '') continue;
+    $out[$slug] = [
+      'title' => $parts[1] ?? '',
+      'description' => $parts[2] ?? '',
+      'h1' => $parts[3] ?? '',
+      'lead' => $parts[4] ?? '',
+      'text' => $parts[5] ?? ''
+    ];
+  }
+  return $out;
+}
+
 function table_exists(PDO $pdo, string $name): bool {
   $stmt = $pdo->prepare("SHOW TABLES LIKE :t");
   $stmt->execute([':t'=>$name]);
@@ -139,9 +173,76 @@ try {
 $host = $_SERVER['HTTP_HOST'] ?? 'stilva.ru';
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $base = $scheme . '://' . $host . '/';
+$pageSlug = '';
+if (isset($_GET['page'])) {
+  $pageSlug = preg_replace('/[^a-z0-9-]+/i', '', (string)$_GET['page']);
+  $pageSlug = trim($pageSlug, '-');
+}
 
 $siteName = trim((string)($seo['site_name'] ?? 'STILVA'));
 if ($siteName === '') $siteName = 'STILVA';
+
+$defaultLandings = [
+  'obshchepit' => [
+    'title' => 'Стеллажи для общепита и ресторанов — STILVA',
+    'description' => 'Стеллажи из нержавейки для общепита: типовые размеры и изготовление под задачу, перфорированные или сплошные полки, подбор стали AISI 304/430.',
+    'h1' => 'Стеллажи для общепита',
+    'lead' => 'Нержавеющая сталь под требования санитарии, удобные конфигурации и быстрый расчёт.',
+    'text' => "Изготавливаем стеллажи для ресторанов, кафе и столовых. Типовые размеры доступны со склада, нестандартные — под задачу.\n\nПодберём марку стали, тип полок и количество ярусов, чтобы стеллаж работал в вашей зоне кухни или подготовки."
+  ],
+  'kukhnya' => [
+    'title' => 'Стеллажи для кухни из нержавеющей стали — STILVA',
+    'description' => 'Кухонные стеллажи из нержавейки: типовые и под заказ, перфорированные/сплошные полки, аккуратная сборка и стойкость к влаге.',
+    'h1' => 'Стеллажи для кухни',
+    'lead' => 'Устойчивые и удобные решения для рабочих зон и хранения.',
+    'text' => "Подходят для кухни любого масштаба — от небольших заведений до производственных кухонь.\n\nСогласуем размеры, тип полок и конфигурацию под планировку помещения."
+  ],
+  'sklad' => [
+    'title' => 'Стеллажи из нержавейки для склада — STILVA',
+    'description' => 'Складские стеллажи из нержавеющей стали: устойчивость, удобный доступ, типовые размеры и изготовление под задачу.',
+    'h1' => 'Стеллажи для склада',
+    'lead' => 'Надёжные решения для влажных и пищевых складов.',
+    'text' => "Подбираем конфигурацию под нагрузку, размеры проходов и логистику склада.\n\nДоступны разборные и сварные исполнения."
+  ],
+  'pod-zakaz' => [
+    'title' => 'Стеллажи из нержавейки на заказ — STILVA',
+    'description' => 'Изготовление стеллажей из нержавеющей стали под заказ: размеры, полки, конфигурации. Быстрый расчёт и согласование сроков.',
+    'h1' => 'Стеллажи под заказ',
+    'lead' => 'Соберём конфигурацию под вашу задачу и помещение.',
+    'text' => "Если типовой ряд не подходит — сделаем стеллаж под нишу или конкретную зону.\n\nСогласуем размеры, марку стали и сроки."
+  ],
+  'perforirovannye-polki' => [
+    'title' => 'Стеллажи с перфорированными полками — STILVA',
+    'description' => 'Перфорированные полки для вентиляции и стекания. Стеллажи из нержавейки с перфорацией — типовые и под заказ.',
+    'h1' => 'Стеллажи с перфорированными полками',
+    'lead' => 'Оптимальны для вентиляции и санитарной обработки.',
+    'text' => "Перфорация снижает накопление влаги и упрощает обслуживание.\n\nПодберём перфорацию и размеры под вашу задачу."
+  ],
+  'sploshnye-polki' => [
+    'title' => 'Стеллажи со сплошными полками — STILVA',
+    'description' => 'Сплошные полки для мелких предметов и упаковки. Стеллажи из нержавейки со сплошными полками — типовые и под заказ.',
+    'h1' => 'Стеллажи со сплошными полками',
+    'lead' => 'Удобно для хранения мелких предметов и тары.',
+    'text' => "Сплошные полки дают устойчивую поверхность под разные типы хранения.\n\nСогласуем размеры и количество ярусов."
+  ]
+];
+
+$landingOverrides = [];
+if (!empty($home['landing_items'])) {
+  $landingOverrides = parse_landing_overrides((string)$home['landing_items']);
+}
+$landingConfig = null;
+if ($pageSlug !== '') {
+  if (isset($landingOverrides[$pageSlug])) {
+    $landingConfig = $landingOverrides[$pageSlug];
+  } elseif (isset($defaultLandings[$pageSlug])) {
+    $landingConfig = $defaultLandings[$pageSlug];
+  }
+}
+if ($landingConfig) {
+  if (!empty($landingConfig['title'])) $seo['title'] = $landingConfig['title'];
+  if (!empty($landingConfig['description'])) $seo['description'] = $landingConfig['description'];
+}
 
 $homeHeroEyebrow = trim((string)($home['hero_eyebrow'] ?? 'стеллажи из нержавеющей стали'));
 $homeHeroTitle = trim((string)($home['hero_title'] ?? "Стеллажи для кухни,\nобщепита и склада"));
@@ -272,12 +373,33 @@ if ($productView){
   if ($pName !== '') {
     $title = $pName.' — '.$siteName;
     $desc = $pDesc;
-    $canonical = abs_url($siteUrl.'?product='.$productIdParam, $base, $scheme);
+    $slug = slugify_ru($pName);
+    if ($slug === '') $slug = 'product';
+    $canonical = abs_url($siteUrl.'product/'.$slug.'-'.$productIdParam.'/', $base, $scheme);
     $ogTitle = $title;
     $ogDesc = $desc;
     $ogType = 'product';
     $img = trim((string)($productView['image_url'] ?? ''));
     if ($img !== '') $ogImage = abs_url($img, $base, $scheme);
+  }
+}
+
+if ($landingConfig && $pageSlug !== '') {
+  $landingTitle = trim((string)($landingConfig['title'] ?? ''));
+  $landingDesc = trim((string)($landingConfig['description'] ?? ''));
+  $landingH1 = trim((string)($landingConfig['h1'] ?? ''));
+  $landingLead = trim((string)($landingConfig['lead'] ?? ''));
+  $landingText = trim((string)($landingConfig['text'] ?? ''));
+  if ($landingTitle !== '') $title = $landingTitle;
+  if ($landingDesc !== '') $desc = $landingDesc;
+  $canonical = abs_url($siteUrl.'lp/'.$pageSlug.'/', $base, $scheme);
+  $ogTitle = $title;
+  $ogDesc = $desc;
+  if ($landingH1 !== '') $homeHeroTitle = $landingH1;
+  if ($landingLead !== '') $homeHeroLead = $landingLead;
+  if ($landingText !== '') {
+    $homeSeoTitle = $landingH1 !== '' ? $landingH1 : $homeSeoTitle;
+    $homeSeoText = $landingText;
   }
 }
 
@@ -320,10 +442,13 @@ if ($products){
       : 'Фото изделия';
 
     $priceText = number_format($price, 0, '.', ' ');
+    $slug = slugify_ru($titleText);
+    if ($slug === '') $slug = 'product';
+    $productUrl = $siteUrl.'product/'.$slug.'-'.$id.'/';
     $catalogHtml .= '
             <article class="product" data-id="'.(int)$id.'">
               <div class="product__body">
-                <div class="product__title"><a class="product__link" href="'.h($siteUrl.'?product='.(int)$id.'#catalog').'">'.h($titleText).'</a></div>
+                <div class="product__title"><a class="product__link" href="'.h($productUrl.'#catalog').'">'.h($titleText).'</a></div>
                 <div class="product__status">'.$statusHtml.'</div>
                 <div class="product__price">'.$priceText.'&nbsp;₽</div>
                 <div class="product__tags">'.$tagsHtml.'</div>
@@ -475,7 +600,9 @@ if ($productView) {
     $id = (int)($p['id'] ?? 0);
     $name = trim((string)($p['name'] ?? ''));
     if ($name === '') $name = 'Товар';
-    $url = abs_url($siteUrl.'?product='.$id, $base, $scheme);
+    $slug = slugify_ru($name);
+    if ($slug === '') $slug = 'product';
+    $url = abs_url($siteUrl.'product/'.$slug.'-'.$id.'/', $base, $scheme);
     $list[] = [
       '@type' => 'ListItem',
       'position' => $pos++,
@@ -631,6 +758,22 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <div class="section__head">
 <h2 class="h2">Каталог готовых решений</h2>
 <p class="lead">Доверьтесь нашему опыту - ниже представлены самые лучше образцы нашей продукции.</p>
+</div>
+<?php
+  $landingLinks = array_keys($defaultLandings);
+  $landingTitles = [
+    'obshchepit' => 'Стеллажи для общепита',
+    'kukhnya' => 'Стеллажи для кухни',
+    'sklad' => 'Стеллажи для склада',
+    'pod-zakaz' => 'Стеллажи под заказ',
+    'perforirovannye-polki' => 'Перфорированные полки',
+    'sploshnye-polki' => 'Сплошные полки'
+  ];
+?>
+<div class="catalog-links">
+<?php foreach ($landingLinks as $slug): ?>
+  <a class="tag" href="/lp/<?= h($slug) ?>/"><?= h($landingTitles[$slug] ?? $slug) ?></a>
+<?php endforeach; ?>
 </div>
 <div class="catalog__grid"><?php if ($catalogHtml !== '') echo $catalogHtml; ?></div>
 </section>

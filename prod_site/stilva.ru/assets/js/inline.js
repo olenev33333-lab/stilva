@@ -90,8 +90,22 @@ document.addEventListener('click', (e)=>{
         const list = await res.json();
         try{ window.__stilvaProducts = list; renderHeroMini(list); }catch(_){}
 
+        const slugify = (value)=>{
+          value = (value || '').toString().toLowerCase();
+          const map = {
+            'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y',
+            'к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f',
+            'х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'
+          };
+          value = value.replace(/[а-яё]/g, ch => map[ch] ?? '');
+          value = value.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g,'');
+          return value || 'product';
+        };
+
         grid.innerHTML = list.map(p=>{
           const title   = p.name || 'Товар';
+          const slug = slugify(title);
+          const link = `/product/${slug}-${p.id}/#catalog`;
           const price   = +p.price || 0;
           const shelves = +p.shelves || 0;
           const desc    = (p.description || '').trim();
@@ -120,7 +134,7 @@ const imgHtml = p.image_url
           return `
             <article class="product" data-id="${p.id}">
               <div class="product__body">
-                <div class="product__title"><a class="product__link" href="?product=${p.id}#catalog">${title}</a></div>
+                <div class="product__title"><a class="product__link" href="${link}">${title}</a></div>
                 <div class="product__status">${statusHtml}</div>
                 <div class="product__price">${price.toLocaleString('ru-RU')}&nbsp;₽</div>
                 <div class="product__tags">

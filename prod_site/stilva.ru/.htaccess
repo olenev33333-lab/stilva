@@ -3,6 +3,10 @@ DirectoryIndex index.php index.html
 RewriteEngine On
 RewriteCond %{THE_REQUEST} \s/+index\.html[\s?] [NC]
 RewriteRule ^index\.html$ / [R=301,L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^product/([a-z0-9-]+)-([0-9]+)/?$ /index.php?product=$2 [L,QSA]
+RewriteRule ^lp/([a-z0-9-]+)/?$ /index.php?page=$1 [L,QSA]
 <FilesMatch "^\.ht">
   Require all denied
 </FilesMatch>
