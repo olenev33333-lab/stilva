@@ -282,8 +282,10 @@ if (preg_match('~^/catalog/([^/]+)/?$~u', $requestPath, $m)) {
   $productToken = trim((string)($_GET['product'] ?? ''));
 }
 if ($productToken !== '' && $products) {
+  $productTokenLower = mb_strtolower($productToken, 'UTF-8');
   foreach ($products as $p){
-    if ((string)product_query_param($p) === $productToken || (string)product_slug($p) === $productToken){
+    $slug = (string)product_slug($p);
+    if ((string)product_query_param($p) === $productToken || $slug === $productToken || mb_strtolower($slug, 'UTF-8') === $productTokenLower){
       $productView = $p;
       break;
     }
