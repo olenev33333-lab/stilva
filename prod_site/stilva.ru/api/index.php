@@ -145,6 +145,35 @@ function stock_column_missing(PDO $pdo, string $table, string $column): bool {
   return empty($row) || (int)$row['c'] === 0;
 }
 
+function product_bootstrap(PDO $pdo): void {
+  static $done = false;
+  if ($done) return;
+  $done = true;
+
+  stock_bootstrap($pdo);
+
+  $alter = [
+    'seo_title' => "ALTER TABLE products ADD COLUMN seo_title VARCHAR(255) NOT NULL DEFAULT '' AFTER description",
+    'seo_description' => "ALTER TABLE products ADD COLUMN seo_description TEXT NULL AFTER seo_title",
+    'seo_keywords' => "ALTER TABLE products ADD COLUMN seo_keywords TEXT NULL AFTER seo_description",
+    'seo_h1' => "ALTER TABLE products ADD COLUMN seo_h1 VARCHAR(255) NOT NULL DEFAULT '' AFTER seo_keywords",
+    'seo_robots' => "ALTER TABLE products ADD COLUMN seo_robots VARCHAR(120) NOT NULL DEFAULT '' AFTER seo_h1",
+    'seo_canonical' => "ALTER TABLE products ADD COLUMN seo_canonical VARCHAR(512) NOT NULL DEFAULT '' AFTER seo_robots",
+    'seo_og_title' => "ALTER TABLE products ADD COLUMN seo_og_title VARCHAR(255) NOT NULL DEFAULT '' AFTER seo_canonical",
+    'seo_og_description' => "ALTER TABLE products ADD COLUMN seo_og_description TEXT NULL AFTER seo_og_title",
+  ];
+
+  foreach ($alter as $column => $sql){
+    try {
+      if (stock_column_missing($pdo, 'products', $column)){
+        $pdo->exec($sql);
+      }
+    } catch (Throwable $e) {
+      // ignore, bootstrap should never break API flow
+    }
+  }
+}
+
 function stock_bootstrap(PDO $pdo){
   $pdo->exec("CREATE TABLE IF NOT EXISTS stock_movements (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1331,7 +1360,7 @@ try {
 
   if (($segments[0] ?? '') === 'products'){
     $pdo = db();
-    stock_bootstrap($pdo);
+    product_bootstrap($pdo);
 
     if ($method === 'GET' && count($segments) === 1){
       $published = isset($_GET['published']) ? $_GET['published'] : null;
@@ -1348,13 +1377,26 @@ try {
     if ($method === 'POST' && count($segments) === 1){
       $b = read_json();
       if (!isset($b['name']) || trim((string)$b['name']) === '') out(400, ['error'=>'name']);
+      $name = trim((string)$b['name']);
       $mode = (string)($b['supply_mode'] ?? 'stock');
       if (!in_array($mode, ['stock','mto','mixed'], true)) $mode = 'stock';
+      $seoTitle = trim((string)($b['seo_title'] ?? ''));
+      if ($seoTitle === '') $seoTitle = $name;
+      $seoDesc = trim((string)($b['seo_description'] ?? ''));
+      if ($seoDesc === '') $seoDesc = trim((string)($b['description'] ?? ''));
+      $seoH1 = trim((string)($b['seo_h1'] ?? ''));
+      if ($seoH1 === '') $seoH1 = $name;
+      $seoOgTitle = trim((string)($b['seo_og_title'] ?? ''));
+      if ($seoOgTitle === '') $seoOgTitle = $seoTitle;
+      $seoOgDesc = trim((string)($b['seo_og_description'] ?? ''));
+      if ($seoOgDesc === '') $seoOgDesc = $seoDesc;
       $stmt = $pdo->prepare("INSERT INTO products
-        (name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, lead_time_days, supply_mode)
-        VALUES (:name, :price, :published, :image_url, :shelves, :material, :construction, :perforation, :shelf_thickness, :description, :stock_qty, :lead_time_days, :supply_mode)");
+        (name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, lead_time_days, supply_mode,
+         seo_title, seo_description, seo_keywords, seo_h1, seo_robots, seo_canonical, seo_og_title, seo_og_description)
+        VALUES (:name, :price, :published, :image_url, :shelves, :material, :construction, :perforation, :shelf_thickness, :description, :stock_qty, :lead_time_days, :supply_mode,
+         :seo_title, :seo_description, :seo_keywords, :seo_h1, :seo_robots, :seo_canonical, :seo_og_title, :seo_og_description)");
       $stmt->execute([
-        ':name' => (string)$b['name'],
+        ':name' => $name,
         ':price' => (float)($b['price'] ?? 0),
         ':published' => !empty($b['published']) ? 1 : 0,
         ':image_url' => (string)($b['image_url'] ?? ''),
@@ -1367,6 +1409,14 @@ try {
         ':stock_qty' => (int)($b['stock_qty'] ?? 0),
         ':lead_time_days' => (int)($b['lead_time_days'] ?? 0),
         ':supply_mode' => $mode,
+        ':seo_title' => $seoTitle,
+        ':seo_description' => $seoDesc,
+        ':seo_keywords' => (string)($b['seo_keywords'] ?? ''),
+        ':seo_h1' => $seoH1,
+        ':seo_robots' => (string)($b['seo_robots'] ?? ''),
+        ':seo_canonical' => (string)($b['seo_canonical'] ?? ''),
+        ':seo_og_title' => $seoOgTitle,
+        ':seo_og_description' => $seoOgDesc,
       ]);
       $id = (int)$pdo->lastInsertId();
       out(200, ['id'=>$id]);
@@ -1386,7 +1436,7 @@ try {
 
       if ($method === 'PUT' || $method === 'PATCH'){
         $b = read_json();
-        $fields = ['name','price','published','image_url','shelves','material','construction','perforation','shelf_thickness','description','stock_qty','lead_time_days','supply_mode'];
+        $fields = ['name','price','published','image_url','shelves','material','construction','perforation','shelf_thickness','description','stock_qty','lead_time_days','supply_mode','seo_title','seo_description','seo_keywords','seo_h1','seo_robots','seo_canonical','seo_og_title','seo_og_description'];
         $set = [];
         $args = [':id'=>$id];
         foreach($fields as $f){

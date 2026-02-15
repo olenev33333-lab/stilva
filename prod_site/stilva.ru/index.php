@@ -46,6 +46,17 @@ function abs_url(string $url, string $base, string $scheme): string {
   return rtrim($base, '/') . '/' . $url;
 }
 
+function product_query_param(array $product): string {
+  $id = (int)($product['id'] ?? 0);
+  return $id > 0 ? (string)$id : '';
+}
+
+function product_public_url(array $product, string $siteUrl): string {
+  $id = product_query_param($product);
+  if ($id === '') return $siteUrl;
+  return $siteUrl . '?product=' . rawurlencode($id);
+}
+
 function phone_digits(string $value): string {
   return preg_replace('/\\D+/', '', $value) ?? '';
 }
@@ -100,17 +111,20 @@ try {
   $seo = settings_get($pdo, 'seo', []);
   $seller = settings_get($pdo, 'seller', []);
   $home = settings_get($pdo, 'home', []);
-  try {
-    $stmt = $pdo->query("SELECT id, name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, supply_mode
-                         FROM products WHERE published = 1 ORDER BY id ASC");
-    $products = $stmt->fetchAll();
-  } catch (Throwable $e) {
-    $stmt = $pdo->query("SELECT id, name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty
-                         FROM products WHERE published = 1 ORDER BY id ASC");
-    $products = $stmt->fetchAll();
-    foreach ($products as &$p){ $p['supply_mode'] = 'stock'; }
-    unset($p);
+  $stmt = $pdo->query("SELECT * FROM products WHERE published = 1 ORDER BY id ASC");
+  $products = $stmt->fetchAll();
+  foreach ($products as &$p){
+    if (!isset($p['supply_mode']) || $p['supply_mode'] === null || $p['supply_mode'] === '') $p['supply_mode'] = 'stock';
+    if (!isset($p['seo_title'])) $p['seo_title'] = '';
+    if (!isset($p['seo_description'])) $p['seo_description'] = '';
+    if (!isset($p['seo_keywords'])) $p['seo_keywords'] = '';
+    if (!isset($p['seo_h1'])) $p['seo_h1'] = '';
+    if (!isset($p['seo_robots'])) $p['seo_robots'] = '';
+    if (!isset($p['seo_canonical'])) $p['seo_canonical'] = '';
+    if (!isset($p['seo_og_title'])) $p['seo_og_title'] = '';
+    if (!isset($p['seo_og_description'])) $p['seo_og_description'] = '';
   }
+  unset($p);
   if ($products) {
     $ids = array_values(array_unique(array_map(fn($p)=>(int)($p['id'] ?? 0), $products)));
     $ids = array_filter($ids, fn($x)=>$x>0);
@@ -245,10 +259,13 @@ $contactNote = $homeContactsNote !== '' ? $homeContactsNote : ($contactAddress !
   : 'Пн–пт 10:00–19:00 • Москва • Работаем по всей России');
 
 $productView = null;
-$productIdParam = isset($_GET['product']) ? (int)$_GET['product'] : 0;
-if ($productIdParam > 0 && $products) {
+$productQueryRaw = trim((string)($_GET['product'] ?? ''));
+if ($productQueryRaw !== '' && $products) {
   foreach ($products as $p){
-    if ((int)($p['id'] ?? 0) === $productIdParam){ $productView = $p; break; }
+    if ((string)product_query_param($p) === $productQueryRaw){
+      $productView = $p;
+      break;
+    }
   }
 }
 
@@ -258,6 +275,14 @@ if ($ogImageAlt === '') $ogImageAlt = $siteName;
 if ($productView){
   $pName = trim((string)($productView['name'] ?? ''));
   $pDesc = trim((string)($productView['description'] ?? ''));
+  $pSeoTitle = trim((string)($productView['seo_title'] ?? ''));
+  $pSeoDesc = trim((string)($productView['seo_description'] ?? ''));
+  $pSeoKeywords = trim((string)($productView['seo_keywords'] ?? ''));
+  $pSeoH1 = trim((string)($productView['seo_h1'] ?? ''));
+  $pSeoRobots = trim((string)($productView['seo_robots'] ?? ''));
+  $pSeoCanonical = trim((string)($productView['seo_canonical'] ?? ''));
+  $pSeoOgTitle = trim((string)($productView['seo_og_title'] ?? ''));
+  $pSeoOgDescription = trim((string)($productView['seo_og_description'] ?? ''));
   $pMaterial = trim((string)($productView['material'] ?? ''));
   $pConstruction = trim((string)($productView['construction'] ?? ''));
   $pPerforation = trim((string)($productView['perforation'] ?? ''));
@@ -273,11 +298,15 @@ if ($productView){
     $pDesc = $parts ? implode('. ', $parts).'.' : $defaultDesc;
   }
   if ($pName !== '') {
-    $title = $pName.' — '.$siteName;
-    $desc = $pDesc;
-    $canonical = abs_url($siteUrl.'?product='.$productIdParam, $base, $scheme);
-    $ogTitle = $title;
-    $ogDesc = $desc;
+    $title = $pSeoTitle !== '' ? $pSeoTitle : ($pName.' — '.$siteName);
+    $desc = $pSeoDesc !== '' ? $pSeoDesc : $pDesc;
+    $keywords = $pSeoKeywords !== '' ? $pSeoKeywords : $keywords;
+    $robots = $pSeoRobots !== '' ? $pSeoRobots : $robots;
+    $canonical = $pSeoCanonical !== ''
+      ? abs_url($pSeoCanonical, $base, $scheme)
+      : abs_url(product_public_url($productView, $siteUrl), $base, $scheme);
+    $ogTitle = $pSeoOgTitle !== '' ? $pSeoOgTitle : $title;
+    $ogDesc = $pSeoOgDescription !== '' ? $pSeoOgDescription : $desc;
     $ogType = 'product';
     $img = trim((string)($productView['image_url'] ?? ''));
     if ($img !== '') $ogImage = abs_url($img, $base, $scheme);
@@ -288,12 +317,15 @@ $heroTitle = $homeHeroTitle;
 if ($productView) {
   $pHeroName = trim((string)($productView['name'] ?? ''));
   if ($pHeroName !== '') $heroTitle = $pHeroName;
+  $pSeoH1 = trim((string)($productView['seo_h1'] ?? ''));
+  if ($pSeoH1 !== '') $heroTitle = $pSeoH1;
 }
 
 $catalogHtml = '';
 if ($products){
   foreach ($products as $p){
     $id = (int)($p['id'] ?? 0);
+    $productUrl = product_public_url($p, $siteUrl);
     $titleText = trim((string)($p['name'] ?? 'Товар'));
     if ($titleText === '') $titleText = 'Товар';
     $price = (float)($p['price'] ?? 0);
@@ -332,7 +364,7 @@ if ($products){
     $catalogHtml .= '
             <article class="product" data-id="'.(int)$id.'">
               <div class="product__body">
-                <div class="product__title"><a class="product__link" href="'.h($siteUrl.'?product='.(int)$id.'#catalog').'">'.h($titleText).'</a></div>
+                <div class="product__title"><a class="product__link" href="'.h($productUrl.'#catalog').'">'.h($titleText).'</a></div>
                 <div class="product__status">'.$statusHtml.'</div>
                 <div class="product__price">'.$priceText.'&nbsp;₽</div>
                 <div class="product__tags">'.$tagsHtml.'</div>
@@ -499,7 +531,7 @@ if ($productView) {
     $id = (int)($p['id'] ?? 0);
     $name = trim((string)($p['name'] ?? ''));
     if ($name === '') $name = 'Товар';
-    $url = abs_url($siteUrl.'?product='.$id, $base, $scheme);
+    $url = abs_url(product_public_url($p, $siteUrl), $base, $scheme);
     $list[] = [
       '@type' => 'ListItem',
       'position' => $pos++,

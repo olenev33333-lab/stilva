@@ -44,15 +44,23 @@ $urls[] = [
 
 try {
   $pdo = db();
-  $stmt = $pdo->query("SELECT id, image_url FROM products WHERE published = 1 ORDER BY id ASC");
-  $rows = $stmt->fetchAll();
+  try {
+    $stmt = $pdo->query("SELECT id, image_url, seo_canonical FROM products WHERE published = 1 ORDER BY id ASC");
+    $rows = $stmt->fetchAll();
+  } catch (Throwable $e) {
+    $stmt = $pdo->query("SELECT id, image_url FROM products WHERE published = 1 ORDER BY id ASC");
+    $rows = $stmt->fetchAll();
+  }
   foreach ($rows as $r){
     $id = (int)($r['id'] ?? 0);
     if ($id <= 0) continue;
     $img = trim((string)($r['image_url'] ?? ''));
     $img = $img !== '' ? abs_url($img, $base, $scheme) : '';
+    $loc = trim((string)($r['seo_canonical'] ?? ''));
+    if ($loc !== '') $loc = abs_url($loc, $base, $scheme);
+    if ($loc === '') $loc = $base . '?product=' . $id;
     $urls[] = [
-      'loc' => $base . '?product=' . $id,
+      'loc' => $loc,
       'lastmod' => $today,
       'changefreq' => 'weekly',
       'priority' => '0.7',
