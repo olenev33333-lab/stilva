@@ -256,6 +256,21 @@
 @media (max-width: 900px){
   .stock-row{grid-template-columns:1fr 90px 90px 36px}
 }
+.production-toolbar{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.production-toolbar input,.production-toolbar select{max-width:170px}
+.production-progress{height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden}
+.production-progress > span{display:block;height:100%;background:linear-gradient(90deg,#10b981,#3b82f6)}
+.production-stages{display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:8px}
+.production-stages .adm-field{margin:0}
+.production-files{display:grid;gap:8px}
+.production-file-row{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
+@media (max-width:1100px){
+  .production-stages{grid-template-columns:repeat(3,minmax(120px,1fr))}
+}
+@media (max-width:720px){
+  .production-toolbar input,.production-toolbar select{max-width:100%}
+  .production-stages{grid-template-columns:repeat(2,minmax(120px,1fr))}
+}
 </style>
 
 
@@ -282,6 +297,7 @@
       <button class="ghost" id="open-stats-left">Статистика</button>
       <button class="ghost" id="open-orders-left">Заказы</button>
       <button class="ghost" id="open-stock-left">Учет товара</button>
+      <button class="ghost" id="open-production-left">Производство</button>
       <button class="ghost" id="open-dds-left">ДДС</button>
     </div>
   </div>
@@ -398,6 +414,50 @@
     </div>
   </div>
 
+  <div id="production-left" style="display:none">
+    <div class="card-head" style="margin-top:-8px">
+      <h3 class="card-title">Производство</h3>
+      <div class="production-toolbar">
+        <input id="production-no-left" type="text" placeholder="№ производства">
+        <input id="production-order-left" type="number" min="1" step="1" placeholder="№ заказа">
+        <input id="production-address-left" type="text" placeholder="Адрес">
+        <input id="production-deadline-from-left" type="date" title="Дедлайн от">
+        <input id="production-deadline-to-left" type="date" title="Дедлайн до">
+        <select id="production-state-left" title="Статус">
+          <option value="">Статус: все</option>
+          <option value="draft">Черновик</option>
+          <option value="confirmed">Подтвержден</option>
+          <option value="in_work">В работе</option>
+          <option value="ready">Готов</option>
+          <option value="closed">Закрыт</option>
+          <option value="cancelled">Отменен</option>
+        </select>
+        <button id="production-apply-left" class="ghost">Показать</button>
+        <button id="production-add-left">+ Заказ</button>
+        <button id="production-refresh-left" class="ghost">Обновить</button>
+        <button class="ghost" id="close-production-left">Закрыть</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="scroll-area" id="production-pane-left">
+        <div class="pane-overlay"><div class="pane-spinner"></div></div>
+        <table id="production-left-table">
+          <colgroup>
+            <col style="width:150px"><col style="width:90px"><col style="width:220px"><col style="width:110px">
+            <col style="width:120px"><col style="width:140px"><col style="width:90px"><col style="width:120px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>№ производства</th><th>Заказ</th><th>Адрес</th><th>Дедлайн</th>
+              <th>Статус</th><th>Прогресс</th><th>Позиций</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div id="dds-left" style="display:none">
     <div class="card-head" style="margin-top:-8px">
       <h3 class="card-title">ДДС</h3>
@@ -463,6 +523,7 @@
           <button class="ghost" id="open-stats">Статистика</button>
           <button class="ghost" id="open-orders-right">Заказы</button>
           <button class="ghost" id="open-stock">Учет товара</button>
+          <button class="ghost" id="open-production">Производство</button>
           <button class="ghost" id="open-dds">ДДС</button>
         </div>
       </div>
@@ -579,6 +640,50 @@
         </div>
       </div>
 
+      <div id="production-right" style="display:none">
+        <div class="card-head" style="margin-top:-8px">
+          <h3 class="card-title">Производство</h3>
+          <div class="production-toolbar">
+            <input id="production-no-right" type="text" placeholder="№ производства">
+            <input id="production-order-right" type="number" min="1" step="1" placeholder="№ заказа">
+            <input id="production-address-right" type="text" placeholder="Адрес">
+            <input id="production-deadline-from-right" type="date" title="Дедлайн от">
+            <input id="production-deadline-to-right" type="date" title="Дедлайн до">
+            <select id="production-state-right" title="Статус">
+              <option value="">Статус: все</option>
+              <option value="draft">Черновик</option>
+              <option value="confirmed">Подтвержден</option>
+              <option value="in_work">В работе</option>
+              <option value="ready">Готов</option>
+              <option value="closed">Закрыт</option>
+              <option value="cancelled">Отменен</option>
+            </select>
+            <button id="production-apply-right" class="ghost">Показать</button>
+            <button id="production-add-right">+ Заказ</button>
+            <button id="production-refresh-right" class="ghost">Обновить</button>
+            <button class="ghost" id="close-production-right">Закрыть</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="scroll-area" id="production-pane-right">
+            <div class="pane-overlay"><div class="pane-spinner"></div></div>
+            <table id="production-right-table">
+              <colgroup>
+                <col style="width:150px"><col style="width:90px"><col style="width:220px"><col style="width:110px">
+                <col style="width:120px"><col style="width:140px"><col style="width:90px"><col style="width:120px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>№ производства</th><th>Заказ</th><th>Адрес</th><th>Дедлайн</th>
+                  <th>Статус</th><th>Прогресс</th><th>Позиций</th><th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div id="dds-right" style="display:none">
         <div class="card-head" style="margin-top:-8px">
           <h3 class="card-title">ДДС</h3>
@@ -645,6 +750,67 @@
     </div>
     <div class="scroll-area" style="max-height:72vh">
       <div style="padding:12px" id="order-modal-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка: заказ на производство -->
+<div class="modal-backdrop" id="production-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="production-modal-title" style="width:min(1120px,96vw)">
+    <div class="modal-head">
+      <h3 id="production-modal-title" class="card-title" style="margin:0">Заказ на производство</h3>
+      <button class="close-x" id="production-modal-close">✕</button>
+    </div>
+    <div class="scroll-area" style="max-height:72vh">
+      <div style="padding:12px">
+        <div class="order-section">
+          <div class="list-title">Шапка заказа</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field"><label>№ производства</label><input type="text" id="production-form-no" disabled></div>
+              <div class="adm-field"><label>№ клиентского заказа</label><input type="number" id="production-form-order-id" min="1" step="1"></div>
+              <div class="adm-field"><label>Адрес</label><input type="text" id="production-form-address"></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Дедлайн</label><input type="date" id="production-form-deadline"></div>
+              <div class="adm-field">
+                <label>Статус</label>
+                <select id="production-form-state">
+                  <option value="draft">Черновик</option>
+                  <option value="confirmed">Подтвержден</option>
+                  <option value="in_work">В работе</option>
+                  <option value="ready">Готов</option>
+                  <option value="closed">Закрыт</option>
+                  <option value="cancelled">Отменен</option>
+                </select>
+              </div>
+              <div class="adm-field"><label>Комментарий</label><input type="text" id="production-form-comment"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-section">
+          <div class="list-title">Позиции и стадии</div>
+          <div id="production-items-wrap" style="display:grid;gap:10px"></div>
+          <div style="margin-top:8px">
+            <button class="ghost" id="production-item-add" type="button">+ Позиция</button>
+          </div>
+        </div>
+
+        <div class="order-section">
+          <div class="list-title">Чертежи и файлы</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="file" id="production-file-input" accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf">
+            <button class="ghost" id="production-file-upload" type="button">Загрузить</button>
+          </div>
+          <div id="production-files-list" class="production-files" style="margin-top:8px"></div>
+        </div>
+
+        <div class="adm-actions">
+          <button class="adm-btn adm-btn--accent" id="production-save">Сохранить</button>
+          <button class="adm-btn adm-btn--ghost" id="production-close-btn">Закрыть</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1531,7 +1697,10 @@ function openOrderModal(order){
     <div style="margin-top:12px"><strong>Итого по заказу:</strong> ${total} ₽</div>
     ${noteHtml}
     <div class="order-section">
-      <div class="list-title">Наличие по позициям</div>
+      <div class="list-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Наличие по позициям</span>
+        <button class="ghost" id="o_to_production" type="button">В производство</button>
+      </div>
       <div class="order-availability">
         <div class="head">Товар</div><div class="head">Нужно</div><div class="head">Доступно</div><div class="head">Статус</div>
         ${availabilityRows || '<div>—</div><div></div><div></div><div></div>'}
@@ -1868,6 +2037,12 @@ function openOrderModal(order){
     const id = orderModalContent.dataset.updId;
     if (!id) return;
     window.open(`/api/upd/${id}/print`, '_blank');
+  });
+  document.getElementById('o_to_production')?.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    const ok = await orderModalSave(true);
+    if (!ok) return;
+    await productionCreateFromOrder(order.id);
   });
   refreshOrderUpd(order.id);
 
@@ -2782,6 +2957,395 @@ function stockConfirmClose(result){
   if (stockConfirmResolver){ stockConfirmResolver(result); stockConfirmResolver = null; }
 }
 
+/* ===== ПРОИЗВОДСТВО ===== */
+const productionStateLabels = {
+  draft:'Черновик',
+  confirmed:'Подтвержден',
+  in_work:'В работе',
+  ready:'Готов',
+  closed:'Закрыт',
+  cancelled:'Отменен'
+};
+const productionStageLabels = {
+  stage_cut:'Резка',
+  stage_bend:'Гибка',
+  stage_fitting:'Слесарные',
+  stage_assembly:'Сборка',
+  stage_qc:'ОТК',
+  stage_stock:'Склад'
+};
+const productionStageStateLabels = { todo:'Не начато', progress:'В работе', done:'Завершено' };
+const productionStageKeys = ['stage_cut','stage_bend','stage_fitting','stage_assembly','stage_qc','stage_stock'];
+const productionStore = { left: [], right: [] };
+let productionFormState = { isNew: true, removedIds: [], items: [], files: [] };
+
+function productionEsc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function productionToInt(v){ const n = parseInt(String(v ?? '0'), 10); return Number.isFinite(n) ? n : 0; }
+function productionStageState(v){ return ['todo','progress','done'].includes(v) ? v : 'todo'; }
+function productionState(v){ return ['draft','confirmed','in_work','ready','closed','cancelled'].includes(v) ? v : 'draft'; }
+function productionProgress(item){
+  const w = { todo:0, progress:0.5, done:1 };
+  let s = 0;
+  productionStageKeys.forEach(k=>{ s += w[productionStageState(item?.[k])] || 0; });
+  return Math.round((s / 6) * 1000) / 10;
+}
+function productionDeriveState(items, fallback='draft'){
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return fallback;
+  let allStockDone = true;
+  let allQcDone = true;
+  let anyStarted = false;
+  list.forEach(it=>{
+    const stock = productionStageState(it?.stage_stock);
+    const qc = productionStageState(it?.stage_qc);
+    if (stock !== 'done') allStockDone = false;
+    if (qc !== 'done') allQcDone = false;
+    productionStageKeys.forEach(k=>{ if (productionStageState(it?.[k]) !== 'todo') anyStarted = true; });
+  });
+  if (allStockDone) return 'closed';
+  if (allQcDone) return 'ready';
+  if (anyStarted) return 'in_work';
+  return fallback;
+}
+function productionBuildQuery(side){
+  const qs = new URLSearchParams();
+  const no = (document.getElementById(`production-no-${side}`)?.value || '').trim();
+  const orderId = (document.getElementById(`production-order-${side}`)?.value || '').trim();
+  const address = (document.getElementById(`production-address-${side}`)?.value || '').trim();
+  const dFrom = (document.getElementById(`production-deadline-from-${side}`)?.value || '').trim();
+  const dTo = (document.getElementById(`production-deadline-to-${side}`)?.value || '').trim();
+  const state = (document.getElementById(`production-state-${side}`)?.value || '').trim();
+  if (no) qs.set('no', no);
+  if (orderId) qs.set('order_id', orderId);
+  if (address) qs.set('address', address);
+  if (dFrom) qs.set('deadline_from', dFrom);
+  if (dTo) qs.set('deadline_to', dTo);
+  if (state) qs.set('state', state);
+  return qs.toString();
+}
+function productionRenderTable(side){
+  const tbody = document.querySelector(`#production-${side}-table tbody`);
+  if (!tbody) return;
+  const list = productionStore[side] || [];
+  tbody.innerHTML = '';
+  list.forEach(job=>{
+    const tr = document.createElement('tr');
+    const pct = Number(job.progress_pct || 0);
+    tr.innerHTML =
+      `<td class="cell-ellipsis">${productionEsc(job.prod_no || '—')}</td>` +
+      `<td class="cell-ellipsis">${job.order_id ? ('#'+job.order_id) : '—'}</td>` +
+      `<td class="cell-wrap">${productionEsc(job.address || '—')}</td>` +
+      `<td class="cell-ellipsis">${productionEsc(job.deadline_date || '—')}</td>` +
+      `<td class="cell-ellipsis">${productionEsc(productionStateLabels[job.state] || job.state || '—')}</td>` +
+      `<td><div class="production-progress"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></div><div class="muted" style="font-size:12px;margin-top:4px">${pct}%</div></td>` +
+      `<td class="cell-ellipsis">${productionToInt(job.items_count)}</td>` +
+      `<td class="actions"><div class="btns"><button class="ghost production-open" data-no="${productionEsc(job.prod_no || '')}">Открыть</button></div></td>`;
+    tbody.appendChild(tr);
+  });
+  if (!list.length){
+    tbody.innerHTML = `<tr><td colspan="8"><span class="muted">Заказов на производство нет</span></td></tr>`;
+  }
+}
+async function loadProduction(side, force=false){
+  const pane = document.getElementById(`production-pane-${side}`);
+  const table = document.getElementById(`production-${side}-table`);
+  const tbody = document.querySelector(`#production-${side}-table tbody`);
+  if (!pane || !table || !tbody) return;
+  const cols = table.querySelector('colgroup')?.children?.length || 8;
+  tbody.innerHTML = skeletonRows(cols, 7);
+  await withOverlay(pane, async ()=>{
+    const qs = productionBuildQuery(side);
+    const res = await api('/api/production' + (qs ? ('?' + qs) : ''));
+    productionStore[side] = res.ok ? await res.json() : [];
+    productionRenderTable(side);
+  });
+}
+function productionIsOpen(side){
+  const el = document.getElementById(`production-${side}`);
+  return !!(el && el.style.display !== 'none');
+}
+function productionRefreshOpen(){
+  if (productionIsOpen('left')) loadProduction('left', true);
+  if (productionIsOpen('right')) loadProduction('right', true);
+}
+async function productionEnsureProducts(){
+  if (!stockState.list.length){
+    await stockFetchList(true);
+  }
+}
+function productionProductOptions(selectedId){
+  const list = stockState.list || [];
+  return list.map(p=>{
+    const id = String(p.id || '');
+    const sel = String(selectedId || '') === id ? 'selected' : '';
+    return `<option value="${id}" ${sel}>${productionEsc(p.name || ('ID '+id))}</option>`;
+  }).join('');
+}
+function productionDefaultItem(prefill = {}){
+  const out = {
+    id: prefill.id || null,
+    product_id: productionToInt(prefill.product_id),
+    qty: Math.max(0, productionToInt(prefill.qty || 1)),
+    qty_done: Math.max(0, productionToInt(prefill.qty_done || 0)),
+    stage_cut: productionStageState(prefill.stage_cut || 'todo'),
+    stage_bend: productionStageState(prefill.stage_bend || 'todo'),
+    stage_fitting: productionStageState(prefill.stage_fitting || 'todo'),
+    stage_assembly: productionStageState(prefill.stage_assembly || 'todo'),
+    stage_qc: productionStageState(prefill.stage_qc || 'todo'),
+    stage_stock: productionStageState(prefill.stage_stock || 'todo')
+  };
+  return out;
+}
+function productionRenderItems(){
+  const wrap = document.getElementById('production-items-wrap');
+  if (!wrap) return;
+  const list = productionFormState.items || [];
+  if (!list.length){
+    wrap.innerHTML = `<div class="muted">Позиции не добавлены</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map((it, idx)=>{
+    const p = (stockState.list || []).find(x=>String(x.id)===String(it.product_id));
+    const pName = p?.name || '';
+    const pct = productionProgress(it);
+    const stages = productionStageKeys.map(k=>{
+      const opts = ['todo','progress','done'].map(v=>`<option value="${v}" ${it[k]===v?'selected':''}>${productionStageStateLabels[v]}</option>`).join('');
+      return `<div class="adm-field"><label>${productionStageLabels[k]}</label><select data-i="${idx}" data-stage="${k}">${opts}</select></div>`;
+    }).join('');
+    return `
+      <div class="production-file-row" data-row="${idx}" style="display:block">
+        <div style="display:grid;grid-template-columns:minmax(220px,1fr) 120px 140px auto;gap:8px;align-items:end">
+          <div class="adm-field">
+            <label>Изделие</label>
+            <select data-i="${idx}" data-field="product_id">${productionProductOptions(it.product_id)}</select>
+            <div class="muted" style="font-size:12px;margin-top:4px">${productionEsc(pName)}</div>
+          </div>
+          <div class="adm-field">
+            <label>Нужно, шт.</label>
+            <input type="number" min="0" step="1" data-i="${idx}" data-field="qty" value="${productionToInt(it.qty)}">
+          </div>
+          <div class="adm-field">
+            <label>Выполнено, шт.</label>
+            <input type="number" min="0" step="1" data-i="${idx}" data-field="qty_done" value="${productionToInt(it.qty_done)}" disabled>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button class="ghost" data-act="remove-item" data-i="${idx}" type="button">Удалить</button>
+          </div>
+        </div>
+        <div class="production-stages" style="margin-top:8px">${stages}</div>
+        <div style="margin-top:8px">
+          <div class="production-progress"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></div>
+          <div class="muted" style="font-size:12px;margin-top:4px">Прогресс позиции: ${pct}%</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function productionRenderFiles(){
+  const wrap = document.getElementById('production-files-list');
+  if (!wrap) return;
+  const files = productionFormState.files || [];
+  if (!files.length){
+    wrap.innerHTML = `<div class="muted">Файлы не загружены</div>`;
+    return;
+  }
+  wrap.innerHTML = files.map(f=>`
+    <div class="production-file-row">
+      <a href="${productionEsc(f.file_url || '')}" target="_blank" rel="noopener">${productionEsc(f.file_name || f.file_url || 'Файл')}</a>
+      <button class="ghost" data-act="remove-file" data-id="${productionToInt(f.id)}" type="button">Удалить</button>
+    </div>
+  `).join('');
+}
+async function productionOpenByNo(prodNo){
+  if (!prodNo) return;
+  await productionEnsureProducts();
+  const res = await api('/api/production/' + encodeURIComponent(prodNo));
+  if (!res.ok){ alert('Не удалось загрузить производственный заказ'); return; }
+  const job = await res.json();
+  productionFormState = {
+    isNew: false,
+    removedIds: [],
+    prod_no: job.prod_no || '',
+    order_id: job.order_id || '',
+    address: job.address || '',
+    deadline_date: job.deadline_date || '',
+    state: productionState(job.state || 'draft'),
+    comment: job.comment || '',
+    items: (job.items || []).map(productionDefaultItem),
+    files: job.files || []
+  };
+  document.getElementById('production-form-no').value = productionFormState.prod_no || '';
+  document.getElementById('production-form-order-id').value = productionFormState.order_id || '';
+  document.getElementById('production-form-address').value = productionFormState.address || '';
+  document.getElementById('production-form-deadline').value = productionFormState.deadline_date || '';
+  document.getElementById('production-form-state').value = productionFormState.state || 'draft';
+  document.getElementById('production-form-comment').value = productionFormState.comment || '';
+  document.getElementById('production-modal-title').textContent = `Заказ на производство ${productionFormState.prod_no}`;
+  productionRenderItems();
+  productionRenderFiles();
+  document.getElementById('production-modal-backdrop').style.display = 'flex';
+}
+async function productionOpenNew(prefill = {}){
+  await productionEnsureProducts();
+  productionFormState = {
+    isNew: true,
+    removedIds: [],
+    prod_no: '',
+    order_id: prefill.order_id || '',
+    address: prefill.address || '',
+    deadline_date: prefill.deadline_date || '',
+    state: productionState(prefill.state || 'draft'),
+    comment: prefill.comment || '',
+    items: (prefill.items || [productionDefaultItem()]).map(productionDefaultItem),
+    files: []
+  };
+  document.getElementById('production-form-no').value = 'будет после сохранения';
+  document.getElementById('production-form-order-id').value = productionFormState.order_id || '';
+  document.getElementById('production-form-address').value = productionFormState.address || '';
+  document.getElementById('production-form-deadline').value = productionFormState.deadline_date || '';
+  document.getElementById('production-form-state').value = productionFormState.state || 'draft';
+  document.getElementById('production-form-comment').value = productionFormState.comment || '';
+  document.getElementById('production-modal-title').textContent = 'Заказ на производство';
+  productionRenderItems();
+  productionRenderFiles();
+  document.getElementById('production-modal-backdrop').style.display = 'flex';
+}
+function productionCloseModal(){
+  const back = document.getElementById('production-modal-backdrop');
+  if (back) back.style.display = 'none';
+}
+function productionCollectPayload(){
+  const orderRaw = (document.getElementById('production-form-order-id')?.value || '').trim();
+  const orderId = orderRaw ? productionToInt(orderRaw) : null;
+  const address = (document.getElementById('production-form-address')?.value || '').trim();
+  const deadline_date = (document.getElementById('production-form-deadline')?.value || '').trim();
+  let state = productionState((document.getElementById('production-form-state')?.value || 'draft'));
+  const comment = (document.getElementById('production-form-comment')?.value || '').trim();
+  const items = (productionFormState.items || []).map(it=>({
+    id: it.id || undefined,
+    product_id: productionToInt(it.product_id),
+    qty: Math.max(0, productionToInt(it.qty)),
+    stage_cut: productionStageState(it.stage_cut),
+    stage_bend: productionStageState(it.stage_bend),
+    stage_fitting: productionStageState(it.stage_fitting),
+    stage_assembly: productionStageState(it.stage_assembly),
+    stage_qc: productionStageState(it.stage_qc),
+    stage_stock: productionStageState(it.stage_stock)
+  })).filter(it=>it.product_id > 0 && it.qty >= 0);
+  if (!['cancelled','closed'].includes(state)){
+    const derived = productionDeriveState(items, state);
+    if (['in_work','ready','closed'].includes(derived)) state = derived;
+  }
+  return {
+    order_id: orderId,
+    address,
+    deadline_date,
+    state,
+    comment,
+    items,
+    remove_ids: productionFormState.removedIds || []
+  };
+}
+async function productionSave(){
+  const payload = productionCollectPayload();
+  if (!payload.items.length){ alert('Добавьте хотя бы одну позицию'); return; }
+  if (productionFormState.isNew){
+    const res = await api('/api/production', { method:'POST', body: JSON.stringify(payload) });
+    if (!res.ok){
+      const err = await res.json().catch(()=>({}));
+      if (err?.error === 'exists'){ alert(`Для этого заказа уже есть производство: ${err.prod_no}`); }
+      else alert('Не удалось создать заказ на производство');
+      return;
+    }
+    const job = await res.json();
+    await productionOpenByNo(job.prod_no);
+    productionRefreshOpen();
+    return;
+  }
+  const no = productionFormState.prod_no;
+  const res = await api('/api/production/' + encodeURIComponent(no), { method:'PATCH', body: JSON.stringify(payload) });
+  if (!res.ok){ alert('Не удалось сохранить заказ на производство'); return; }
+  const job = await res.json();
+  await productionOpenByNo(job.prod_no);
+  productionRefreshOpen();
+  stockRefreshOpen();
+}
+async function productionUploadFile(){
+  const no = productionFormState.prod_no;
+  if (!no){ alert('Сначала сохраните заказ'); return; }
+  const input = document.getElementById('production-file-input');
+  const file = input?.files?.[0];
+  if (!file){ alert('Выберите файл'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  const up = await fetch('/api/production/upload', {
+    method:'POST',
+    credentials:'include',
+    headers:{ 'x-dev-auth': '1' },
+    body: fd
+  });
+  if (!up.ok){ alert('Не удалось загрузить файл'); return; }
+  const data = await up.json();
+  const save = await api('/api/production/' + encodeURIComponent(no) + '/files', {
+    method:'POST',
+    body: JSON.stringify({ url: data.url, name: data.name || file.name })
+  });
+  if (!save.ok){ alert('Файл загружен, но не привязан к заказу'); return; }
+  input.value = '';
+  await productionOpenByNo(no);
+}
+async function productionRemoveFile(fileId){
+  const no = productionFormState.prod_no;
+  if (!no || !fileId) return;
+  const res = await api('/api/production/' + encodeURIComponent(no) + '/files/' + fileId, { method:'DELETE' });
+  if (!res.ok){ alert('Не удалось удалить файл'); return; }
+  await productionOpenByNo(no);
+}
+async function productionCreateFromOrder(orderId){
+  if (!orderId) return;
+  const res = await api('/api/production/from-order', {
+    method:'POST',
+    body: JSON.stringify({ order_id: Number(orderId) })
+  });
+  if (!res.ok){
+    const err = await res.json().catch(()=>({}));
+    if (err?.error === 'no_shortage'){
+      alert('Для этого заказа дефицита нет — производство не требуется');
+      return;
+    }
+    alert('Не удалось сформировать заказ на производство');
+    return;
+  }
+  const job = await res.json();
+  await productionOpenByNo(job.prod_no);
+  productionRefreshOpen();
+}
+function productionCancelChoice(orderId, jobs){
+  const backdrop = document.getElementById('cancel-prod-modal-backdrop');
+  const text = document.getElementById('cancel-prod-modal-text');
+  const btnAbort = document.getElementById('cancel-prod-modal-abort');
+  const btnDetach = document.getElementById('cancel-prod-modal-detach');
+  const btnCancel = document.getElementById('cancel-prod-modal-cancel');
+  const btnX = document.getElementById('cancel-prod-modal-close');
+  if (!backdrop || !text || !btnAbort || !btnDetach || !btnCancel || !btnX) return Promise.resolve(null);
+  const active = (jobs || []).filter(j => !['cancelled','closed'].includes(String(j.state || '')));
+  if (!active.length) return Promise.resolve(null);
+  const names = active.map(j => j.prod_no).filter(Boolean).join(', ');
+  text.textContent = `По заказу #${orderId} есть активное производство (${names}). Что сделать?`;
+  backdrop.style.display = 'flex';
+  return new Promise(resolve=>{
+    const cleanup = ()=>{
+      backdrop.style.display = 'none';
+      btnAbort.onclick = btnDetach.onclick = btnCancel.onclick = btnX.onclick = backdrop.onclick = null;
+    };
+    btnAbort.onclick = ()=>{ cleanup(); resolve(null); };
+    btnX.onclick = ()=>{ cleanup(); resolve(null); };
+    backdrop.onclick = (e)=>{ if (e.target === backdrop){ cleanup(); resolve(null); } };
+    btnDetach.onclick = ()=>{ cleanup(); resolve('detach'); };
+    btnCancel.onclick = ()=>{ cleanup(); resolve('cancel'); };
+  });
+}
+
 /* ===== СТАТИСТИКА ===== */
 function loadStats(){
   const resultEl = document.getElementById('stats-result');
@@ -2898,12 +3462,14 @@ function loadStats(){
     document.getElementById('stats-left').style.display='none';
     document.getElementById('orders-left').style.display='none';
     document.getElementById('stock-left').style.display='none';
+    document.getElementById('production-left').style.display='none';
     document.getElementById('dds-left').style.display='none';
     const el=document.getElementById(section+'-left'); if(el) el.style.display='block';
     if(section==='products') loadProductsShortInto('products-left-table','products-pane-left');
     if(section==='stats') populateStatProductsLeft();
     if(section==='orders'){ loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft); wireOrderSort('#orders-left-table', currentSortLeft, ()=>loadOrdersInto('#orders-left-table tbody','orders-left-pane','status-filter-left', currentSortLeft)); }
     if(section==='stock'){ loadStock('left'); }
+    if(section==='production'){ loadProduction('left', true); }
     if(section==='dds'){ loadDds('left'); }
   }
   function backToMenuLeft(){
@@ -2912,18 +3478,21 @@ function loadStats(){
     document.getElementById('stats-left').style.display='none';
     document.getElementById('orders-left').style.display='none';
     document.getElementById('stock-left').style.display='none';
+    document.getElementById('production-left').style.display='none';
     document.getElementById('dds-left').style.display='none';
   }
   document.getElementById('open-products-left').addEventListener('click', ()=>showLeft('products'));
   document.getElementById('open-stats-left').addEventListener('click', ()=>showLeft('stats'));
   document.getElementById('open-orders-left').addEventListener('click', ()=>showLeft('orders'));
   document.getElementById('open-stock-left').addEventListener('click', ()=>showLeft('stock'));
+  document.getElementById('open-production-left').addEventListener('click', ()=>showLeft('production'));
   const ddsLeft = document.getElementById('open-dds-left');
   if (ddsLeft) ddsLeft.addEventListener('click', ()=>showLeft('dds'));
   document.getElementById('close-products-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-stats-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-orders-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-stock-left').addEventListener('click', backToMenuLeft);
+  document.getElementById('close-production-left').addEventListener('click', backToMenuLeft);
   document.getElementById('close-dds-left').addEventListener('click', backToMenuLeft);
 
   async function populateStatProductsLeft(){ return; }
@@ -3037,26 +3606,30 @@ async function loadStatsLeft(){
     document.getElementById('stats-right').style.display='none';
     document.getElementById('orders-right').style.display='none';
     document.getElementById('stock-right').style.display='none';
+    document.getElementById('production-right').style.display='none';
     document.getElementById('dds-right').style.display='none';
     const el=document.getElementById(section+'-right'); if(el) el.style.display='block';
     if(section==='products') loadProductsShortInto('products-table','products-pane');
     if(section==='stats') populateStatProducts();
     if(section==='orders'){ loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight); wireOrderSort('#orders-right-table', currentSortRight, ()=>loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight)); }
     if(section==='stock'){ loadStock('right'); }
+    if(section==='production'){ loadProduction('right', true); }
     if(section==='dds'){ loadDds('right'); }
   }
-  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; document.getElementById('stock-right').style.display='none'; document.getElementById('dds-right').style.display='none'; }
+  function backToMenu(){ document.getElementById('right-menu').style.display='block'; document.getElementById('products-right').style.display='none'; document.getElementById('stats-right').style.display='none'; document.getElementById('orders-right').style.display='none'; document.getElementById('stock-right').style.display='none'; document.getElementById('production-right').style.display='none'; document.getElementById('dds-right').style.display='none'; }
 
   document.getElementById('open-products').addEventListener('click', ()=>showRight('products'));
   document.getElementById('open-stats').addEventListener('click', ()=>showRight('stats'));
   document.getElementById('open-orders-right').addEventListener('click', ()=>showRight('orders'));
   document.getElementById('open-stock').addEventListener('click', ()=>showRight('stock'));
+  document.getElementById('open-production').addEventListener('click', ()=>showRight('production'));
   const ddsRight = document.getElementById('open-dds');
   if (ddsRight) ddsRight.addEventListener('click', ()=>showRight('dds'));
   document.getElementById('close-products').addEventListener('click', backToMenu);
   document.getElementById('close-stats').addEventListener('click', backToMenu);
   document.getElementById('close-orders-right').addEventListener('click', backToMenu);
   document.getElementById('close-stock-right').addEventListener('click', backToMenu);
+  document.getElementById('close-production-right').addEventListener('click', backToMenu);
   document.getElementById('close-dds-right').addEventListener('click', backToMenu);
   document.getElementById('load-stats').addEventListener('click', async (ev)=>{ await withOverlay(ev.currentTarget, async ()=>{ await loadStats(); }); });
   document.getElementById('dds-apply-left').addEventListener('click', ()=>loadDds('left'));
@@ -3088,6 +3661,70 @@ async function loadStatsLeft(){
   });
   document.getElementById('status-filter-right').addEventListener('change', ()=>{
     loadOrdersInto('#orders-right-table tbody','orders-right-pane','status-filter-right', currentSortRight);
+  });
+
+  document.getElementById('production-apply-left').addEventListener('click', ()=>loadProduction('left', true));
+  document.getElementById('production-apply-right').addEventListener('click', ()=>loadProduction('right', true));
+  document.getElementById('production-refresh-left').addEventListener('click', ()=>loadProduction('left', true));
+  document.getElementById('production-refresh-right').addEventListener('click', ()=>loadProduction('right', true));
+  document.getElementById('production-add-left').addEventListener('click', ()=>productionOpenNew());
+  document.getElementById('production-add-right').addEventListener('click', ()=>productionOpenNew());
+
+  ['left','right'].forEach(side=>{
+    const table = document.getElementById(`production-${side}-table`);
+    table?.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.production-open');
+      if (!btn) return;
+      const no = btn.getAttribute('data-no') || '';
+      if (no) productionOpenByNo(no);
+    });
+  });
+
+  const productionBackdrop = document.getElementById('production-modal-backdrop');
+  document.getElementById('production-modal-close')?.addEventListener('click', productionCloseModal);
+  document.getElementById('production-close-btn')?.addEventListener('click', productionCloseModal);
+  productionBackdrop?.addEventListener('click', (e)=>{ if (e.target === productionBackdrop) productionCloseModal(); });
+  document.getElementById('production-save')?.addEventListener('click', (e)=>{ e.preventDefault(); productionSave(); });
+  document.getElementById('production-item-add')?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    productionFormState.items.push(productionDefaultItem());
+    productionRenderItems();
+  });
+  document.getElementById('production-file-upload')?.addEventListener('click', (e)=>{ e.preventDefault(); productionUploadFile(); });
+  document.getElementById('production-items-wrap')?.addEventListener('change', (e)=>{
+    const t = e.target;
+    const idx = productionToInt(t?.dataset?.i);
+    if (!Number.isFinite(idx) || !productionFormState.items[idx]) return;
+    if (t.dataset.field === 'product_id'){
+      productionFormState.items[idx].product_id = productionToInt(t.value);
+      productionRenderItems();
+      return;
+    }
+    if (t.dataset.field === 'qty'){
+      productionFormState.items[idx].qty = Math.max(0, productionToInt(t.value));
+      return;
+    }
+    if (t.dataset.stage){
+      productionFormState.items[idx][t.dataset.stage] = productionStageState(t.value);
+      productionRenderItems();
+      return;
+    }
+  });
+  document.getElementById('production-items-wrap')?.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-act="remove-item"]');
+    if (!btn) return;
+    const idx = productionToInt(btn.dataset.i);
+    const item = productionFormState.items[idx];
+    if (!item) return;
+    if (item.id) productionFormState.removedIds.push(item.id);
+    productionFormState.items.splice(idx, 1);
+    productionRenderItems();
+  });
+  document.getElementById('production-files-list')?.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-act="remove-file"]');
+    if (!btn) return;
+    const id = productionToInt(btn.dataset.id);
+    if (id > 0) productionRemoveFile(id);
   });
 
   async function populateStatProducts(){ return; }
@@ -3587,17 +4224,44 @@ async function loadStatsLeft(){
       btnSave.onclick = async ()=>{
         const reason = txt.value.trim();
         if(!reason){ txt.focus(); txt.style.boxShadow='0 0 0 3px rgba(220,38,38,.25)'; return; }
-        cleanup();
+        let prodAction = null;
+        try{
+          const jobsRes = await api('/api/production/order/' + orderId);
+          const jobs = jobsRes.ok ? await jobsRes.json() : [];
+          const activeJobs = (jobs || []).filter(j => !['cancelled','closed'].includes(String(j.state || '')));
+          if (activeJobs.length){
+            cleanup();
+            prodAction = await productionCancelChoice(orderId, activeJobs);
+            if (!prodAction){
+              const prev = selectEl.dataset.prev || 'Новый';
+              selectEl.value = prev;
+              applyRowStatusClass(selectEl.closest('tr'), prev);
+              return;
+            }
+          } else {
+            cleanup();
+          }
+        } catch (_){
+          cleanup();
+        }
         await withOverlay(selectEl, async ()=>{
           await api('/api/orders/'+orderId+'/status',{method:'PATCH', body: JSON.stringify({status:'Отменен'})});
           const idx = ordersCache.findIndex(x=>String(x.id)===String(orderId));
           const prevNote = idx>-1 ? (ordersCache[idx].note||'').trim() : '';
           const newNote = addCancelStampToNote(prevNote, reason);
           await api('/api/orders/' + orderId, { method: 'PATCH', body: JSON.stringify({ cancel_reason: reason, note: newNote }) });
+          if (prodAction){
+            await api('/api/production/order/' + orderId + '/cancel-action', {
+              method:'POST',
+              body: JSON.stringify({ action: prodAction })
+            });
+          }
           if(idx>-1){ ordersCache[idx].status='Отменен'; ordersCache[idx].cancel_reason = reason; ordersCache[idx].note = newNote; }
           setLocalCancel(String(orderId), reason, newNote);
           selectEl.dataset.prev = 'Отменен'; applyRowStatusClass(selectEl.closest('tr'), 'Отменен');
           ddsRefreshOpen();
+          stockRefreshOpen();
+          productionRefreshOpen();
         });
       };
     }
@@ -3697,6 +4361,23 @@ async function loadStatsLeft(){
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="ghost" id="cancel-modal-cancel">Отмена</button>
         <button id="cancel-modal-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="cancel-prod-modal-backdrop" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cancel-prod-modal-title" style="width:min(720px,96vw)">
+    <div class="modal-head">
+      <h3 id="cancel-prod-modal-title" class="card-title" style="margin:0">Производство по отмененному заказу</h3>
+      <button class="close-x" id="cancel-prod-modal-close">✕</button>
+    </div>
+    <div style="padding:12px;display:grid;gap:12px">
+      <div id="cancel-prod-modal-text" class="muted"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="ghost" id="cancel-prod-modal-abort">Отмена действия</button>
+        <button class="ghost" id="cancel-prod-modal-detach">Оставить в производстве</button>
+        <button id="cancel-prod-modal-cancel">Отменить производство</button>
       </div>
     </div>
   </div>

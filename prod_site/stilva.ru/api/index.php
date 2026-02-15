@@ -376,6 +376,7 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
   $reservedTotal = stock_reserved_map($pdo, $productIds);
   $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
   $prodByOrder = stock_production_by_order($pdo, $orderId);
+  $prodHead = production_order_head($pdo, $orderId);
 
   foreach ($items as $it){
     $pid = (int)$it['product_id'];
@@ -429,6 +430,20 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
           ':cmt'=>'Под заказ #'.$orderId,
           ':cb'=>'admin',
         ]);
+        if (!empty($prodHead['prod_no'])){
+          $pdo->prepare("UPDATE production_orders
+            SET prod_no = :no,
+                prod_address = :addr,
+                deadline_date = :dl,
+                source = 'auto',
+                prod_state = IF(prod_state='cancelled','draft',prod_state)
+            WHERE id = :id")->execute([
+              ':no'=>$prodHead['prod_no'],
+              ':addr'=>$prodHead['prod_address'] ?: null,
+              ':dl'=>$prodHead['deadline_date'] ?: null,
+              ':id'=>(int)$pdo->lastInsertId()
+            ]);
+        }
       }
     } else {
       if ($prod){
@@ -458,6 +473,7 @@ function stock_plan_order(PDO $pdo, int $orderId){
 
   $reservedTotal = stock_reserved_map($pdo, $productIds);
   $prodByOrder = stock_production_by_order($pdo, $orderId);
+  $prodHead = production_order_head($pdo, $orderId);
 
   foreach ($items as $it){
     $pid = (int)$it['product_id'];
@@ -486,6 +502,20 @@ function stock_plan_order(PDO $pdo, int $orderId){
           ':cmt'=>'Под заказ #'.$orderId,
           ':cb'=>'admin',
         ]);
+        if (!empty($prodHead['prod_no'])){
+          $pdo->prepare("UPDATE production_orders
+            SET prod_no = :no,
+                prod_address = :addr,
+                deadline_date = :dl,
+                source = 'auto',
+                prod_state = IF(prod_state='cancelled','draft',prod_state)
+            WHERE id = :id")->execute([
+              ':no'=>$prodHead['prod_no'],
+              ':addr'=>$prodHead['prod_address'] ?: null,
+              ':dl'=>$prodHead['deadline_date'] ?: null,
+              ':id'=>(int)$pdo->lastInsertId()
+            ]);
+        }
       }
     } else {
       if ($prod){
@@ -510,8 +540,6 @@ function stock_cancel_order(PDO $pdo, int $orderId){
       'comment'=>'Снятие резерва (отмена) #'.$orderId,
     ]);
   }
-  $pdo->prepare("UPDATE production_orders SET status='cancelled' WHERE order_id = :oid AND status='open'")
-      ->execute([':oid'=>$orderId]);
 }
 
 function stock_release_reserve(PDO $pdo, int $orderId){
@@ -606,6 +634,248 @@ function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $ne
   } catch (Throwable $e) {
     // intentionally ignore to avoid breaking order flow
   }
+}
+
+function production_stage_keys(): array {
+  return ['stage_cut','stage_bend','stage_fitting','stage_assembly','stage_qc','stage_stock'];
+}
+
+function production_state_keys(): array {
+  return ['draft','confirmed','in_work','ready','closed','cancelled'];
+}
+
+function production_stage_state(string $value): string {
+  return in_array($value, ['todo','progress','done'], true) ? $value : 'todo';
+}
+
+function production_order_state(string $value): string {
+  return in_array($value, production_state_keys(), true) ? $value : 'draft';
+}
+
+function production_bootstrap(PDO $pdo): void {
+  stock_bootstrap($pdo);
+  $alter = [
+    'prod_no' => "ALTER TABLE production_orders ADD COLUMN prod_no VARCHAR(40) NULL AFTER order_id",
+    'prod_state' => "ALTER TABLE production_orders ADD COLUMN prod_state ENUM('draft','confirmed','in_work','ready','closed','cancelled') NOT NULL DEFAULT 'draft' AFTER status",
+    'prod_address' => "ALTER TABLE production_orders ADD COLUMN prod_address VARCHAR(255) NULL AFTER prod_state",
+    'deadline_date' => "ALTER TABLE production_orders ADD COLUMN deadline_date DATE NULL AFTER prod_address",
+    'source' => "ALTER TABLE production_orders ADD COLUMN source ENUM('auto','manual') NOT NULL DEFAULT 'auto' AFTER deadline_date",
+    'stage_cut' => "ALTER TABLE production_orders ADD COLUMN stage_cut ENUM('todo','progress','done') NOT NULL DEFAULT 'todo' AFTER source",
+    'stage_bend' => "ALTER TABLE production_orders ADD COLUMN stage_bend ENUM('todo','progress','done') NOT NULL DEFAULT 'todo' AFTER stage_cut",
+    'stage_fitting' => "ALTER TABLE production_orders ADD COLUMN stage_fitting ENUM('todo','progress','done') NOT NULL DEFAULT 'todo' AFTER stage_bend",
+    'stage_assembly' => "ALTER TABLE production_orders ADD COLUMN stage_assembly ENUM('todo','progress','done') NOT NULL DEFAULT 'todo' AFTER stage_fitting",
+    'stage_qc' => "ALTER TABLE production_orders ADD COLUMN stage_qc ENUM('todo','progress','done') NOT NULL DEFAULT 'todo' AFTER stage_assembly",
+    'stage_stock' => "ALTER TABLE production_orders ADD COLUMN stage_stock ENUM('todo','progress','done') NOT NULL DEFAULT 'todo' AFTER stage_qc",
+    'updated_at' => "ALTER TABLE production_orders ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"
+  ];
+  foreach ($alter as $column => $sql){
+    try {
+      if (stock_column_missing($pdo, 'production_orders', $column)){
+        $pdo->exec($sql);
+      }
+    } catch (Throwable $e) {
+      // bootstrap should not break API flow
+    }
+  }
+
+  try { $pdo->exec("CREATE INDEX idx_prod_no ON production_orders (prod_no)"); } catch (Throwable $e) {}
+  try { $pdo->exec("CREATE INDEX idx_deadline_date ON production_orders (deadline_date)"); } catch (Throwable $e) {}
+  try { $pdo->exec("CREATE INDEX idx_prod_state ON production_orders (prod_state)"); } catch (Throwable $e) {}
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS production_files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    prod_no VARCHAR(40) NOT NULL,
+    order_id INT NULL,
+    file_url VARCHAR(512) NOT NULL,
+    file_name VARCHAR(255) NULL,
+    created_by VARCHAR(64) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_prod_no (prod_no),
+    KEY idx_order_id (order_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function production_next_no(PDO $pdo): string {
+  production_bootstrap($pdo);
+  $year = date('Y');
+  $prefix = 'PZ-' . $year . '-';
+  $stmt = $pdo->prepare("SELECT MAX(CAST(SUBSTRING_INDEX(prod_no, '-', -1) AS UNSIGNED)) AS m
+    FROM production_orders
+    WHERE prod_no LIKE :pref");
+  $stmt->execute([':pref' => $prefix . '%']);
+  $row = $stmt->fetch();
+  $seq = ($row && $row['m'] !== null) ? ((int)$row['m'] + 1) : 1;
+  return $prefix . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+}
+
+function production_order_head(PDO $pdo, int $orderId): array {
+  if ($orderId <= 0) return ['prod_no'=>'', 'prod_address'=>'', 'deadline_date'=>''];
+  $stmt = $pdo->prepare("SELECT prod_no, prod_address, deadline_date
+    FROM production_orders
+    WHERE order_id = :oid AND prod_no IS NOT NULL AND prod_no <> ''
+    ORDER BY id DESC
+    LIMIT 1");
+  $stmt->execute([':oid'=>$orderId]);
+  $row = $stmt->fetch();
+  if (!$row) return ['prod_no'=>'', 'prod_address'=>'', 'deadline_date'=>''];
+  return [
+    'prod_no'=>(string)($row['prod_no'] ?? ''),
+    'prod_address'=>(string)($row['prod_address'] ?? ''),
+    'deadline_date'=>(string)($row['deadline_date'] ?? ''),
+  ];
+}
+
+function production_fetch_rows(PDO $pdo, string $prodNo): array {
+  $stmt = $pdo->prepare("SELECT po.*, p.name AS product_name
+    FROM production_orders po
+    LEFT JOIN products p ON p.id = po.product_id
+    WHERE po.prod_no = :no
+    ORDER BY po.id ASC");
+  $stmt->execute([':no'=>$prodNo]);
+  return $stmt->fetchAll();
+}
+
+function production_fetch_files(PDO $pdo, string $prodNo): array {
+  $stmt = $pdo->prepare("SELECT * FROM production_files WHERE prod_no = :no ORDER BY id DESC");
+  $stmt->execute([':no'=>$prodNo]);
+  return $stmt->fetchAll();
+}
+
+function production_stage_progress(array $row): float {
+  $w = ['todo'=>0.0,'progress'=>0.5,'done'=>1.0];
+  $sum = 0.0;
+  foreach (production_stage_keys() as $k){
+    $state = production_stage_state((string)($row[$k] ?? 'todo'));
+    $sum += $w[$state] ?? 0.0;
+  }
+  return round(($sum / 6.0) * 100.0, 1);
+}
+
+function production_group_state(array $rows): string {
+  if (!$rows) return 'draft';
+  $allCancelled = true;
+  $allStockDone = true;
+  $allQcDone = true;
+  $anyStarted = false;
+  $anyConfirmed = false;
+  foreach ($rows as $r){
+    $state = production_order_state((string)($r['prod_state'] ?? 'draft'));
+    $status = (string)($r['status'] ?? 'open');
+    if (!($state === 'cancelled' || $status === 'cancelled')) $allCancelled = false;
+    $stageStock = production_stage_state((string)($r['stage_stock'] ?? 'todo'));
+    $stageQc = production_stage_state((string)($r['stage_qc'] ?? 'todo'));
+    if ($stageStock !== 'done') $allStockDone = false;
+    if ($stageQc !== 'done') $allQcDone = false;
+    foreach (production_stage_keys() as $k){
+      $sv = production_stage_state((string)($r[$k] ?? 'todo'));
+      if ($sv !== 'todo') $anyStarted = true;
+    }
+    if (in_array($state, ['confirmed','in_work','ready','closed'], true)) $anyConfirmed = true;
+  }
+  if ($allCancelled) return 'cancelled';
+  if ($allStockDone) return 'closed';
+  if ($allQcDone) return 'ready';
+  if ($anyStarted) return 'in_work';
+  if ($anyConfirmed) return 'confirmed';
+  return 'draft';
+}
+
+function production_state_to_row_status(string $state): string {
+  if ($state === 'closed') return 'closed';
+  if ($state === 'cancelled') return 'cancelled';
+  return 'open';
+}
+
+function production_touch_rows_state(PDO $pdo, string $prodNo, string $state): void {
+  $state = production_order_state($state);
+  $status = production_state_to_row_status($state);
+  $stmt = $pdo->prepare("UPDATE production_orders SET prod_state = :st, status = :status WHERE prod_no = :no");
+  $stmt->execute([':st'=>$state, ':status'=>$status, ':no'=>$prodNo]);
+}
+
+function production_make_item_stock_done(PDO $pdo, array $row): void {
+  $id = (int)($row['id'] ?? 0);
+  $pid = (int)($row['product_id'] ?? 0);
+  $qty = (int)($row['qty'] ?? 0);
+  $qtyDone = (int)($row['qty_done'] ?? 0);
+  if ($id <= 0 || $pid <= 0) return;
+  $delta = $qty - $qtyDone;
+  if ($delta < 0) $delta = 0;
+  if ($delta > 0){
+    $pdo->prepare("UPDATE products SET stock_qty = stock_qty + :q WHERE id = :id")
+      ->execute([':q'=>$delta, ':id'=>$pid]);
+    stock_insert_movement($pdo, [
+      'product_id'=>$pid,
+      'qty'=>$delta,
+      'type'=>'in',
+      'reason'=>'production',
+      'order_id'=>isset($row['order_id']) ? (int)$row['order_id'] : null,
+      'comment'=>'Приход из производства '.(string)($row['prod_no'] ?? ''),
+      'created_by'=>'admin',
+    ]);
+  }
+  $pdo->prepare("UPDATE production_orders
+    SET qty_done = qty, stage_stock = 'done', prod_state = 'closed', status = 'closed'
+    WHERE id = :id")->execute([':id'=>$id]);
+  $orderId = isset($row['order_id']) ? (int)$row['order_id'] : 0;
+  if ($orderId > 0){
+    stock_apply_reservation($pdo, $orderId);
+  }
+}
+
+function production_rows_to_job(array $rows, array $files = []): array {
+  if (!$rows) return [];
+  $first = $rows[0];
+  $items = [];
+  $sumQty = 0;
+  $sumDone = 0;
+  $sumProgress = 0.0;
+  foreach ($rows as $r){
+    $progress = production_stage_progress($r);
+    $sumProgress += $progress;
+    $sumQty += (int)($r['qty'] ?? 0);
+    $sumDone += (int)($r['qty_done'] ?? 0);
+    $item = [
+      'id' => (int)$r['id'],
+      'product_id' => (int)$r['product_id'],
+      'product_name' => (string)($r['product_name'] ?? ('ID '.(int)$r['product_id'])),
+      'qty' => (int)($r['qty'] ?? 0),
+      'qty_done' => (int)($r['qty_done'] ?? 0),
+      'status' => (string)($r['status'] ?? 'open'),
+      'prod_state' => production_order_state((string)($r['prod_state'] ?? 'draft')),
+      'stage_cut' => production_stage_state((string)($r['stage_cut'] ?? 'todo')),
+      'stage_bend' => production_stage_state((string)($r['stage_bend'] ?? 'todo')),
+      'stage_fitting' => production_stage_state((string)($r['stage_fitting'] ?? 'todo')),
+      'stage_assembly' => production_stage_state((string)($r['stage_assembly'] ?? 'todo')),
+      'stage_qc' => production_stage_state((string)($r['stage_qc'] ?? 'todo')),
+      'stage_stock' => production_stage_state((string)($r['stage_stock'] ?? 'todo')),
+      'progress_pct' => $progress,
+      'comment' => (string)($r['comment'] ?? ''),
+      'created_at' => (string)($r['created_at'] ?? ''),
+      'updated_at' => (string)($r['updated_at'] ?? ''),
+    ];
+    $items[] = $item;
+  }
+
+  $state = production_group_state($rows);
+  $progressGroup = count($rows) > 0 ? round($sumProgress / count($rows), 1) : 0.0;
+  return [
+    'prod_no' => (string)($first['prod_no'] ?? ''),
+    'order_id' => isset($first['order_id']) ? (int)$first['order_id'] : null,
+    'state' => $state,
+    'address' => (string)($first['prod_address'] ?? ''),
+    'deadline_date' => (string)($first['deadline_date'] ?? ''),
+    'comment' => (string)($first['comment'] ?? ''),
+    'created_at' => (string)($first['created_at'] ?? ''),
+    'updated_at' => (string)($first['updated_at'] ?? ''),
+    'items_count' => count($items),
+    'total_qty' => $sumQty,
+    'total_done' => $sumDone,
+    'progress_pct' => $progressGroup,
+    'files_count' => count($files),
+    'files' => $files,
+    'items' => $items,
+  ];
 }
 
 function order_bootstrap(PDO $pdo){
@@ -2211,6 +2481,501 @@ try {
         $pdo->rollBack();
         out(500, ['error'=>'fail']);
       }
+    }
+
+    out(404, ['error'=>'nf']);
+  }
+
+  if (($segments[0] ?? '') === 'production'){
+    $pdo = db();
+    production_bootstrap($pdo);
+    $sub = $segments[1] ?? '';
+
+    if ($sub === 'upload' && $method === 'POST'){
+      if (empty($_FILES['file']) || !is_array($_FILES['file'])) out(400, ['error'=>'no_file']);
+      $file = $_FILES['file'];
+      if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) out(400, ['error'=>'upload']);
+      $orig = (string)($file['name'] ?? 'file');
+      $ext = strtolower((string)pathinfo($orig, PATHINFO_EXTENSION));
+      $allow = ['pdf','png','jpg','jpeg','dwg','dxf'];
+      if (!in_array($ext, $allow, true)) out(400, ['error'=>'ext']);
+      $dir = __DIR__ . '/../uploads/production_docs';
+      if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+      $name = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+      $dest = $dir . '/' . $name;
+      if (!move_uploaded_file($file['tmp_name'], $dest)) out(500, ['error'=>'save']);
+      out(200, ['url'=>'/uploads/production_docs/'.$name, 'name'=>$orig]);
+    }
+
+    if ($method === 'GET' && count($segments) === 1){
+      $no = trim((string)($_GET['no'] ?? ''));
+      $orderId = isset($_GET['order_id']) && is_numeric($_GET['order_id']) ? (int)$_GET['order_id'] : 0;
+      $address = trim((string)($_GET['address'] ?? ''));
+      $stateRaw = trim((string)($_GET['state'] ?? ''));
+      $state = $stateRaw !== '' ? production_order_state($stateRaw) : '';
+      $deadlineFrom = trim((string)($_GET['deadline_from'] ?? ''));
+      $deadlineTo = trim((string)($_GET['deadline_to'] ?? ''));
+
+      $conds = ["po.prod_no IS NOT NULL", "po.prod_no <> ''"];
+      $args = [];
+      if ($no !== ''){
+        $conds[] = "po.prod_no LIKE :no";
+        $args[':no'] = '%'.$no.'%';
+      }
+      if ($orderId > 0){
+        $conds[] = "po.order_id = :oid";
+        $args[':oid'] = $orderId;
+      }
+      if ($address !== ''){
+        $conds[] = "po.prod_address LIKE :addr";
+        $args[':addr'] = '%'.$address.'%';
+      }
+      if ($deadlineFrom !== ''){
+        $conds[] = "po.deadline_date >= :df";
+        $args[':df'] = $deadlineFrom;
+      }
+      if ($deadlineTo !== ''){
+        $conds[] = "po.deadline_date <= :dt";
+        $args[':dt'] = $deadlineTo;
+      }
+      if ($state !== ''){
+        $conds[] = "po.prod_state = :st";
+        $args[':st'] = $state;
+      }
+      $where = 'WHERE '.implode(' AND ', $conds);
+      $stmt = $pdo->prepare("SELECT po.*, p.name AS product_name
+        FROM production_orders po
+        LEFT JOIN products p ON p.id = po.product_id
+        $where
+        ORDER BY po.updated_at DESC, po.id DESC");
+      $stmt->execute($args);
+      $rows = $stmt->fetchAll();
+      $groups = [];
+      foreach ($rows as $r){
+        $key = (string)($r['prod_no'] ?? '');
+        if ($key === '') continue;
+        if (!isset($groups[$key])) $groups[$key] = [];
+        $groups[$key][] = $r;
+      }
+
+      $fileCounts = [];
+      if ($groups){
+        $nos = array_keys($groups);
+        $placeholders = implode(',', array_fill(0, count($nos), '?'));
+        $q = $pdo->prepare("SELECT prod_no, COUNT(*) AS c FROM production_files WHERE prod_no IN ($placeholders) GROUP BY prod_no");
+        $q->execute($nos);
+        foreach ($q->fetchAll() as $fr){
+          $fileCounts[(string)$fr['prod_no']] = (int)$fr['c'];
+        }
+      }
+
+      $jobs = [];
+      foreach ($groups as $prodNo=>$groupRows){
+        $job = production_rows_to_job($groupRows, []);
+        $job['files_count'] = (int)($fileCounts[$prodNo] ?? 0);
+        unset($job['files']);
+        if (!isset($_GET['with_items']) || $_GET['with_items'] !== '1'){
+          unset($job['items']);
+        }
+        $jobs[] = $job;
+      }
+      out(200, $jobs);
+    }
+
+    if ($method === 'POST' && count($segments) === 2 && $segments[1] === 'from-order'){
+      $b = read_json();
+      $orderId = isset($b['order_id']) ? (int)$b['order_id'] : 0;
+      if ($orderId <= 0) out(400, ['error'=>'order_required']);
+
+      $ordStmt = $pdo->prepare("SELECT id, delivery_address FROM orders WHERE id = :id");
+      $ordStmt->execute([':id'=>$orderId]);
+      $ord = $ordStmt->fetch();
+      if (!$ord) out(404, ['error'=>'order_nf']);
+
+      $items = order_items_with_availability($pdo, $orderId);
+      $short = [];
+      foreach ($items as $it){
+        $pid = isset($it['product_id']) ? (int)$it['product_id'] : 0;
+        $qty = isset($it['shortage_qty']) ? (int)$it['shortage_qty'] : 0;
+        if ($pid > 0 && $qty > 0) $short[] = ['product_id'=>$pid, 'qty'=>$qty];
+      }
+      if (!$short) out(400, ['error'=>'no_shortage']);
+
+      $existingStmt = $pdo->prepare("SELECT prod_no FROM production_orders
+        WHERE order_id = :oid AND prod_no IS NOT NULL AND prod_no <> ''
+        ORDER BY id DESC LIMIT 1");
+      $existingStmt->execute([':oid'=>$orderId]);
+      $ex = $existingStmt->fetch();
+      $prodNo = $ex ? (string)$ex['prod_no'] : production_next_no($pdo);
+
+      $address = trim((string)($b['address'] ?? ''));
+      if ($address === '') $address = trim((string)($ord['delivery_address'] ?? ''));
+      $deadlineDate = trim((string)($b['deadline_date'] ?? ''));
+      $comment = trim((string)($b['comment'] ?? ''));
+
+      $pdo->beginTransaction();
+      try {
+        $currentRows = production_fetch_rows($pdo, $prodNo);
+        $byProduct = [];
+        foreach ($currentRows as $r){
+          $pid = (int)($r['product_id'] ?? 0);
+          if ($pid > 0) $byProduct[$pid] = $r;
+        }
+        $keep = [];
+        foreach ($short as $it){
+          $pid = (int)$it['product_id'];
+          $qty = (int)$it['qty'];
+          $keep[$pid] = true;
+          $row = $byProduct[$pid] ?? null;
+          if ($row){
+            $pdo->prepare("UPDATE production_orders
+              SET qty = :q,
+                  order_id = :oid,
+                  prod_no = :no,
+                  prod_address = :addr,
+                  deadline_date = :dl,
+                  source = 'auto',
+                  comment = :cmt,
+                  status = 'open',
+                  prod_state = IF(prod_state='cancelled','draft',prod_state)
+              WHERE id = :id")
+              ->execute([
+                ':q'=>$qty,
+                ':oid'=>$orderId,
+                ':no'=>$prodNo,
+                ':addr'=>$address ?: null,
+                ':dl'=>$deadlineDate ?: null,
+                ':cmt'=>$comment ?: null,
+                ':id'=>(int)$row['id'],
+              ]);
+          } else {
+            $pdo->prepare("INSERT INTO production_orders
+              (product_id, order_id, prod_no, qty, qty_done, status, prod_state, prod_address, deadline_date, source, comment, created_by)
+              VALUES (:pid,:oid,:no,:q,0,'open','draft',:addr,:dl,'auto',:cmt,:cb)")
+              ->execute([
+                ':pid'=>$pid,
+                ':oid'=>$orderId,
+                ':no'=>$prodNo,
+                ':q'=>$qty,
+                ':addr'=>$address ?: null,
+                ':dl'=>$deadlineDate ?: null,
+                ':cmt'=>$comment ?: ('Под заказ #'.$orderId),
+                ':cb'=>'admin',
+              ]);
+          }
+        }
+        foreach ($currentRows as $r){
+          $pid = (int)($r['product_id'] ?? 0);
+          if (!$pid || isset($keep[$pid])) continue;
+          $pdo->prepare("UPDATE production_orders SET status='cancelled', prod_state='cancelled' WHERE id = :id")
+            ->execute([':id'=>(int)$r['id']]);
+        }
+        $pdo->commit();
+      } catch (Throwable $e){
+        $pdo->rollBack();
+        out(500, ['error'=>'fail']);
+      }
+
+      $rows = production_fetch_rows($pdo, $prodNo);
+      $files = production_fetch_files($pdo, $prodNo);
+      out(200, production_rows_to_job($rows, $files));
+    }
+
+    if ($method === 'GET' && count($segments) === 3 && $segments[1] === 'order'){
+      $orderId = (int)$segments[2];
+      if ($orderId <= 0) out(400, ['error'=>'order_required']);
+      $stmt = $pdo->prepare("SELECT DISTINCT prod_no FROM production_orders
+        WHERE order_id = :oid AND prod_no IS NOT NULL AND prod_no <> ''
+        ORDER BY id DESC");
+      $stmt->execute([':oid'=>$orderId]);
+      $nos = array_map(fn($r)=>(string)$r['prod_no'], $stmt->fetchAll());
+      $jobs = [];
+      foreach ($nos as $prodNo){
+        $rows = production_fetch_rows($pdo, $prodNo);
+        if (!$rows) continue;
+        $jobs[] = production_rows_to_job($rows, []);
+      }
+      out(200, $jobs);
+    }
+
+    if ($method === 'POST' && count($segments) === 4 && $segments[1] === 'order' && $segments[3] === 'cancel-action'){
+      $orderId = (int)$segments[2];
+      $b = read_json();
+      $action = (string)($b['action'] ?? '');
+      if ($orderId <= 0) out(400, ['error'=>'order_required']);
+      if (!in_array($action, ['cancel','detach'], true)) out(400, ['error'=>'action']);
+
+      if ($action === 'cancel'){
+        $stmt = $pdo->prepare("UPDATE production_orders
+          SET status='cancelled', prod_state='cancelled'
+          WHERE order_id = :oid AND prod_state <> 'closed'");
+        $stmt->execute([':oid'=>$orderId]);
+        out(200, ['ok'=>true, 'action'=>'cancel', 'affected'=>$stmt->rowCount()]);
+      }
+
+      $stmt = $pdo->prepare("UPDATE production_orders
+        SET order_id = NULL, source = 'manual'
+        WHERE order_id = :oid AND prod_state NOT IN ('closed','cancelled')");
+      $stmt->execute([':oid'=>$orderId]);
+      out(200, ['ok'=>true, 'action'=>'detach', 'affected'=>$stmt->rowCount()]);
+    }
+
+    if ($method === 'POST' && count($segments) === 1){
+      $b = read_json();
+      $orderId = isset($b['order_id']) && is_numeric($b['order_id']) ? (int)$b['order_id'] : null;
+      $prodNo = trim((string)($b['prod_no'] ?? ''));
+      if ($prodNo === '') $prodNo = production_next_no($pdo);
+      $address = trim((string)($b['address'] ?? ''));
+      $deadlineDate = trim((string)($b['deadline_date'] ?? ''));
+      $comment = trim((string)($b['comment'] ?? ''));
+      $stateCreate = production_order_state((string)($b['state'] ?? 'draft'));
+      $statusCreate = production_state_to_row_status($stateCreate);
+      $items = is_array($b['items'] ?? null) ? $b['items'] : [];
+      if (!$items) out(400, ['error'=>'no_items']);
+
+      if ($orderId && $orderId > 0){
+        $stmt = $pdo->prepare("SELECT prod_no FROM production_orders
+          WHERE order_id = :oid AND prod_state <> 'cancelled' AND status <> 'cancelled'
+          LIMIT 1");
+        $stmt->execute([':oid'=>$orderId]);
+        $ex = $stmt->fetch();
+        if ($ex && (string)($ex['prod_no'] ?? '') !== ''){
+          out(409, ['error'=>'exists', 'prod_no'=>(string)$ex['prod_no']]);
+        }
+      } else {
+        $orderId = null;
+      }
+
+      $pdo->beginTransaction();
+      try{
+        $ins = $pdo->prepare("INSERT INTO production_orders
+          (product_id, order_id, prod_no, qty, qty_done, status, prod_state, prod_address, deadline_date, source, comment, created_by)
+          VALUES (:pid,:oid,:no,:q,0,:status,:state,:addr,:dl,'manual',:cmt,:cb)");
+        $count = 0;
+        foreach ($items as $it){
+          $pid = isset($it['product_id']) ? (int)$it['product_id'] : 0;
+          $qty = isset($it['qty']) ? (int)$it['qty'] : 0;
+          if ($pid <= 0 || $qty <= 0) continue;
+          $ins->execute([
+            ':pid'=>$pid,
+            ':oid'=>$orderId,
+            ':no'=>$prodNo,
+            ':q'=>$qty,
+            ':status'=>$statusCreate,
+            ':state'=>$stateCreate,
+            ':addr'=>$address ?: null,
+            ':dl'=>$deadlineDate ?: null,
+            ':cmt'=>$comment ?: null,
+            ':cb'=>'admin',
+          ]);
+          $count++;
+        }
+        if ($count <= 0){
+          $pdo->rollBack();
+          out(400, ['error'=>'no_valid_items']);
+        }
+        $pdo->commit();
+      }catch(Throwable $e){
+        $pdo->rollBack();
+        out(500, ['error'=>'fail']);
+      }
+
+      if ($stateCreate === 'closed'){
+        $rowsClose = production_fetch_rows($pdo, $prodNo);
+        foreach ($rowsClose as $r){ production_make_item_stock_done($pdo, $r); }
+        production_touch_rows_state($pdo, $prodNo, 'closed');
+      }
+
+      $rows = production_fetch_rows($pdo, $prodNo);
+      $files = production_fetch_files($pdo, $prodNo);
+      out(200, production_rows_to_job($rows, $files));
+    }
+
+    if (count($segments) === 2){
+      $prodNo = urldecode((string)$segments[1]);
+      if ($method === 'GET'){
+        $rows = production_fetch_rows($pdo, $prodNo);
+        if (!$rows) out(404, ['error'=>'nf']);
+        $files = production_fetch_files($pdo, $prodNo);
+        out(200, production_rows_to_job($rows, $files));
+      }
+
+      if ($method === 'PATCH'){
+        $rows = production_fetch_rows($pdo, $prodNo);
+        if (!$rows) out(404, ['error'=>'nf']);
+        $b = read_json();
+        $state = array_key_exists('state', $b) ? production_order_state((string)$b['state']) : null;
+        $addr = array_key_exists('address', $b) ? trim((string)$b['address']) : null;
+        $dl = array_key_exists('deadline_date', $b) ? trim((string)$b['deadline_date']) : null;
+        $cmt = array_key_exists('comment', $b) ? trim((string)$b['comment']) : null;
+        $orderIdSet = null;
+        if (array_key_exists('order_id', $b)){
+          $orderIdSet = is_numeric($b['order_id']) && (int)$b['order_id'] > 0 ? (int)$b['order_id'] : null;
+        }
+
+        $pdo->beginTransaction();
+        try{
+          if ($addr !== null || $dl !== null || $cmt !== null || array_key_exists('order_id', $b)){
+            $set = [];
+            $args = [':no'=>$prodNo];
+            if ($addr !== null){ $set[] = "prod_address = :addr"; $args[':addr'] = $addr ?: null; }
+            if ($dl !== null){ $set[] = "deadline_date = :dl"; $args[':dl'] = $dl ?: null; }
+            if ($cmt !== null){ $set[] = "comment = :cmt"; $args[':cmt'] = $cmt ?: null; }
+            if (array_key_exists('order_id', $b)){ $set[] = "order_id = :oid"; $args[':oid'] = $orderIdSet; }
+            if ($set){
+              $pdo->prepare("UPDATE production_orders SET ".implode(',', $set)." WHERE prod_no = :no")->execute($args);
+            }
+          }
+
+          $rowsById = [];
+          foreach ($rows as $r){ $rowsById[(int)$r['id']] = $r; }
+          $itemsPatch = is_array($b['items'] ?? null) ? $b['items'] : [];
+          $removeIds = array_values(array_unique(array_map('intval', is_array($b['remove_ids'] ?? null) ? $b['remove_ids'] : [])));
+          foreach ($removeIds as $rid){
+            if ($rid <= 0 || !isset($rowsById[$rid])) continue;
+            $pdo->prepare("UPDATE production_orders SET status='cancelled', prod_state='cancelled' WHERE id = :id")
+              ->execute([':id'=>$rid]);
+          }
+          $rowHead = $rows[0];
+          $headOrderId = array_key_exists('order_id', $b) ? $orderIdSet : (isset($rowHead['order_id']) ? (int)$rowHead['order_id'] : null);
+          $headAddr = $addr !== null ? ($addr ?: null) : ((string)($rowHead['prod_address'] ?? '') ?: null);
+          $headDl = $dl !== null ? ($dl ?: null) : ((string)($rowHead['deadline_date'] ?? '') ?: null);
+          $headComment = $cmt !== null ? ($cmt ?: null) : ((string)($rowHead['comment'] ?? '') ?: null);
+          foreach ($itemsPatch as $it){
+            $id = isset($it['id']) ? (int)$it['id'] : 0;
+            if ($id <= 0 || !isset($rowsById[$id])){
+              $pid = isset($it['product_id']) ? (int)$it['product_id'] : 0;
+              $qty = isset($it['qty']) ? (int)$it['qty'] : 0;
+              if ($pid <= 0 || $qty < 0) continue;
+              $argsIns = [
+                ':pid'=>$pid,
+                ':oid'=>$headOrderId,
+                ':no'=>$prodNo,
+                ':q'=>$qty,
+                ':addr'=>$headAddr,
+                ':dl'=>$headDl,
+                ':src'=>'manual',
+                ':cmt'=>$headComment,
+                ':cb'=>'admin',
+                ':stage_cut'=>production_stage_state((string)($it['stage_cut'] ?? 'todo')),
+                ':stage_bend'=>production_stage_state((string)($it['stage_bend'] ?? 'todo')),
+                ':stage_fitting'=>production_stage_state((string)($it['stage_fitting'] ?? 'todo')),
+                ':stage_assembly'=>production_stage_state((string)($it['stage_assembly'] ?? 'todo')),
+                ':stage_qc'=>production_stage_state((string)($it['stage_qc'] ?? 'todo')),
+                ':stage_stock'=>production_stage_state((string)($it['stage_stock'] ?? 'todo')),
+              ];
+              $pdo->prepare("INSERT INTO production_orders
+                (product_id, order_id, prod_no, qty, qty_done, status, prod_state, prod_address, deadline_date, source, comment, created_by,
+                 stage_cut, stage_bend, stage_fitting, stage_assembly, stage_qc, stage_stock)
+                VALUES
+                (:pid,:oid,:no,:q,0,'open','draft',:addr,:dl,:src,:cmt,:cb,:stage_cut,:stage_bend,:stage_fitting,:stage_assembly,:stage_qc,:stage_stock)")
+                ->execute($argsIns);
+              if ($argsIns[':stage_stock'] === 'done'){
+                $newId = (int)$pdo->lastInsertId();
+                $rowAfter = $pdo->prepare("SELECT * FROM production_orders WHERE id = :id");
+                $rowAfter->execute([':id'=>$newId]);
+                $newRow = $rowAfter->fetch();
+                if ($newRow) production_make_item_stock_done($pdo, $newRow);
+              }
+              continue;
+            }
+            $cur = $rowsById[$id];
+            $set = [];
+            $args = [':id'=>$id];
+            if (array_key_exists('qty', $it)){
+              $q = (int)$it['qty'];
+              if ($q < 0) $q = 0;
+              $set[] = "qty = :q";
+              $args[':q'] = $q;
+              if ((int)$cur['qty_done'] > $q){
+                $set[] = "qty_done = :qd";
+                $args[':qd'] = $q;
+              }
+            }
+            foreach (production_stage_keys() as $sk){
+              if (array_key_exists($sk, $it)){
+                $set[] = "$sk = :$sk";
+                $args[":$sk"] = production_stage_state((string)$it[$sk]);
+              }
+            }
+            if (!$set) continue;
+            $pdo->prepare("UPDATE production_orders SET ".implode(',', $set)." WHERE id = :id")->execute($args);
+            $rowAfter = $pdo->prepare("SELECT * FROM production_orders WHERE id = :id");
+            $rowAfter->execute([':id'=>$id]);
+            $newRow = $rowAfter->fetch();
+            if (!$newRow) continue;
+            $prevStock = production_stage_state((string)($cur['stage_stock'] ?? 'todo'));
+            $nextStock = production_stage_state((string)($newRow['stage_stock'] ?? 'todo'));
+            if ($prevStock !== 'done' && $nextStock === 'done'){
+              production_make_item_stock_done($pdo, $newRow);
+            }
+          }
+
+          if ($state !== null){
+            if ($state === 'closed'){
+              $rowsClose = production_fetch_rows($pdo, $prodNo);
+              foreach ($rowsClose as $r){ production_make_item_stock_done($pdo, $r); }
+              production_touch_rows_state($pdo, $prodNo, 'closed');
+            } else {
+              production_touch_rows_state($pdo, $prodNo, $state);
+            }
+          }
+
+          $rowsAfter = production_fetch_rows($pdo, $prodNo);
+          if (!$rowsAfter){
+            $pdo->rollBack();
+            out(404, ['error'=>'nf']);
+          }
+          if ($state === null){
+            $derived = production_group_state($rowsAfter);
+            production_touch_rows_state($pdo, $prodNo, $derived);
+          }
+          $pdo->commit();
+        }catch(Throwable $e){
+          $pdo->rollBack();
+          out(500, ['error'=>'fail']);
+        }
+        $rowsFinal = production_fetch_rows($pdo, $prodNo);
+        $files = production_fetch_files($pdo, $prodNo);
+        out(200, production_rows_to_job($rowsFinal, $files));
+      }
+    }
+
+    if (count($segments) === 3){
+      $prodNo = urldecode((string)$segments[1]);
+      if ($segments[2] === 'files' && $method === 'GET'){
+        out(200, production_fetch_files($pdo, $prodNo));
+      }
+      if ($segments[2] === 'files' && $method === 'POST'){
+        $b = read_json();
+        $url = trim((string)($b['url'] ?? ''));
+        $name = trim((string)($b['name'] ?? ''));
+        if ($url === '') out(400, ['error'=>'url']);
+        $stmt = $pdo->prepare("SELECT order_id FROM production_orders WHERE prod_no = :no ORDER BY id ASC LIMIT 1");
+        $stmt->execute([':no'=>$prodNo]);
+        $row = $stmt->fetch();
+        if (!$row) out(404, ['error'=>'nf']);
+        $orderId = isset($row['order_id']) ? (int)$row['order_id'] : null;
+        $ins = $pdo->prepare("INSERT INTO production_files (prod_no, order_id, file_url, file_name, created_by)
+          VALUES (:no, :oid, :url, :name, :cb)");
+        $ins->execute([
+          ':no'=>$prodNo,
+          ':oid'=>$orderId ?: null,
+          ':url'=>$url,
+          ':name'=>$name ?: null,
+          ':cb'=>'admin',
+        ]);
+        out(200, ['id'=>(int)$pdo->lastInsertId()]);
+      }
+    }
+
+    if (count($segments) === 4 && $segments[2] === 'files' && $method === 'DELETE'){
+      $prodNo = urldecode((string)$segments[1]);
+      $fileId = (int)$segments[3];
+      if ($fileId <= 0) out(400, ['error'=>'file_id']);
+      $stmt = $pdo->prepare("DELETE FROM production_files WHERE id = :id AND prod_no = :no");
+      $stmt->execute([':id'=>$fileId, ':no'=>$prodNo]);
+      out(200, ['ok'=>true]);
     }
 
     out(404, ['error'=>'nf']);
