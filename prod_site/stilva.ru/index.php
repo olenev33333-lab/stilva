@@ -229,6 +229,9 @@ if ($twitterCard === '') $twitterCard = 'summary_large_image';
 $googleVerify = trim((string)($seo['google_verification'] ?? ''));
 $yandexVerify = trim((string)($seo['yandex_verification'] ?? ''));
 $bingVerify = trim((string)($seo['bing_verification'] ?? ''));
+$yandexMetrikaId = preg_replace('/\D+/', '', (string)($seo['yandex_metrika_id'] ?? '')) ?? '';
+$gaMeasurementId = strtoupper(trim((string)($seo['google_analytics_id'] ?? '')));
+$gaMeasurementId = preg_replace('/[^A-Z0-9\-]/', '', $gaMeasurementId) ?? '';
 
 $contactEmail = trim((string)($seller['email'] ?? 'sales@stilva.example'));
 if ($contactEmail === '') $contactEmail = 'sales@stilva.example';
@@ -279,6 +282,12 @@ if ($productView){
     $img = trim((string)($productView['image_url'] ?? ''));
     if ($img !== '') $ogImage = abs_url($img, $base, $scheme);
   }
+}
+
+$heroTitle = $homeHeroTitle;
+if ($productView) {
+  $pHeroName = trim((string)($productView['name'] ?? ''));
+  if ($pHeroName !== '') $heroTitle = $pHeroName;
 }
 
 $catalogHtml = '';
@@ -583,22 +592,63 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <meta content="<?= h($ogType) ?>" property="og:type"/>
 <meta content="<?= h($ogLocale) ?>" property="og:locale"/>
 <?php if ($productView): ?>
-<?php if ($productView): ?>
 <meta content="<?= h(number_format((float)($productView['price'] ?? 0), 2, '.', '')) ?>" property="product:price:amount"/>
 <meta content="RUB" property="product:price:currency"/>
-<?php endif; ?>
 <?php endif; ?>
 <meta content="<?= h($twitterCard) ?>" name="twitter:card"/>
 <meta content="<?= h($ogTitle) ?>" name="twitter:title"/>
 <meta content="<?= h($ogDesc) ?>" name="twitter:description"/>
 <meta content="<?= h($ogImage) ?>" name="twitter:image"/>
 <meta content="<?= h($ogImageAlt) ?>" name="twitter:image:alt"/>
+<?php if ($gaMeasurementId !== ''): ?>
+<script async src="https://www.googletagmanager.com/gtag/js?id=<?= h($gaMeasurementId) ?>"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){ dataLayer.push(arguments); }
+window.gtag = window.gtag || gtag;
+gtag('js', new Date());
+gtag('config', '<?= h($gaMeasurementId) ?>', { anonymize_ip: true });
+</script>
+<?php endif; ?>
+<?php if ($yandexMetrikaId !== ''): ?>
+<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+m[i].l=1*new Date();for (var j=0;j<document.scripts.length;j++) {if (document.scripts[j].src===r) { return; }}
+k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+ym(<?= (int)$yandexMetrikaId ?>, "init", {
+  clickmap:true,
+  trackLinks:true,
+  accurateTrackBounce:true,
+  webvisor:true
+});
+</script>
+<?php endif; ?>
+<script>
+window.STILVA_ANALYTICS = {
+  ymId: <?= json_encode($yandexMetrikaId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+  gaId: <?= json_encode($gaMeasurementId, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+};
+window.stilvaTrack = function(eventName, params){
+  try{
+    var ev = String(eventName || '').trim();
+    if (!ev) return;
+    var payload = (params && typeof params === 'object') ? params : {};
+    var cfg = window.STILVA_ANALYTICS || {};
+    if (cfg.gaId && typeof window.gtag === 'function') window.gtag('event', ev, payload);
+    if (cfg.ymId && typeof window.ym === 'function') window.ym(Number(cfg.ymId), 'reachGoal', ev, payload);
+  }catch(_){}
+};
+</script>
 <?php if ($ld): ?>
 <script type="application/ld+json"><?= $ld ?></script>
 <?php endif; ?>
 <link href="assets/css/main.css" rel="stylesheet"/>
 </head>
 <body>
+<?php if ($yandexMetrikaId !== ''): ?>
+<noscript><div><img src="https://mc.yandex.ru/watch/<?= (int)$yandexMetrikaId ?>" style="position:absolute;left:-9999px" alt=""/></div></noscript>
+<?php endif; ?>
 <!-- Header -->
 <div class="wrap header">
 <div class="header__row">
@@ -618,9 +668,8 @@ $ld = json_encode($ldObjects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 <div class="inner">
 <div class="hero__grid">
 <div>
-<span class="eyebrow">стеллажи из нержавейки</span>
 <span class="eyebrow"><?= h($homeHeroEyebrow) ?></span>
-<h1><?= render_multiline($homeHeroTitle) ?></h1>
+<h1><?= render_multiline($heroTitle) ?></h1>
 <p><?= h($homeHeroLead) ?></p>
 <div class="cta-row">
 <a class="btn" href="<?= h($homeHeroCta1Link) ?>"><?= h($homeHeroCta1Text) ?></a>

@@ -119,6 +119,14 @@
     );
   }
 
+  function track(eventName, params){
+    try{
+      if (typeof window.stilvaTrack === 'function') {
+        window.stilvaTrack(eventName, params || {});
+      }
+    }catch(_){}
+  }
+
   // Экспорт
   window.cart = cart;
 
@@ -127,6 +135,7 @@
     const btn = e.target.closest('#cart-badge, [data-cart-open], .js-open-cart, .cart-toggle');
     if (!btn) return;
     e.preventDefault();
+    track('begin_checkout', { items_count: cart.count(), value: cart.total() });
     cart.open();
   });
 
@@ -161,6 +170,20 @@
   // Первый рендер
   cart.load();
   cart.render();
+
+  document.addEventListener('click', (e)=>{
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    const href = String(link.getAttribute('href') || '');
+    if (!href) return;
+    if (href.startsWith('tel:')) {
+      track('phone_click', { href });
+    } else if (href.startsWith('mailto:')) {
+      track('email_click', { href });
+    } else if (href.includes('t.me/') || href.includes('wa.me/')) {
+      track('messenger_click', { href });
+    }
+  });
 
   /* ====== Отправка заказа с индикатором ====== */
 
@@ -202,6 +225,7 @@
       })),
       total
     };
+    track('submit_order', { items_count: items.length, value: total });
 
     const okEl  = $id('order-success');
     const errEl = $id('order-error');
@@ -224,8 +248,10 @@
       // успех
       cart.clear();
       form.reset();
+      track('order_success', { items_count: items.length, value: total });
       if (okEl)  { okEl.textContent = 'Заявка отправлена! Мы свяжемся с Вами сегодня, в ближайшее время'; okEl.style.display = 'block'; }
     } catch (err) {
+      track('order_error', { items_count: items.length, value: total });
       if (errEl) {
         errEl.textContent = 'Не удалось отправить заказ. Сервер недоступен или отклонил запрос.';
         errEl.style.display = 'block';
@@ -237,5 +263,4 @@
   });
 
 })();
-
 

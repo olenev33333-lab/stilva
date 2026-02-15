@@ -10,6 +10,11 @@
 
 (function bootOnce(){
     if (window.__stilvaBoot) return; window.__stilvaBoot = true;
+function track(eventName, params){
+  try{
+    if (typeof window.stilvaTrack === 'function') window.stilvaTrack(eventName, params || {});
+  }catch(_){}
+}
 // ====== FULLSIZE IMAGE VIEWER (микро) ======
 function __ensureImgViewer(){
   let box = document.getElementById('img-viewer');
@@ -228,6 +233,7 @@ return `
     document.addEventListener('click', (e)=>{
       const card = e.target.closest('.hero-mini__card');
       if (!card) return;
+      track('hero_catalog_click', { item_id: Number(card.dataset.id || 0) || 0 });
       const tgt = document.querySelector(card.dataset.goto || '#catalog');
       if (tgt) { tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     }, {passive:true});
@@ -249,6 +255,7 @@ return `
 
       if (window.cart && (typeof window.cart.add === 'function' || typeof window.cart.upsert === 'function')){
         (window.cart.add || window.cart.upsert).call(window.cart, { id, name, price, qty: 1 });
+        track('add_to_cart', { item_id: Number(id) || 0, value: Number(price) || 0, item_name: name });
         openCartPanel();
         e.preventDefault();
       }

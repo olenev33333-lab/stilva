@@ -775,6 +775,8 @@
               <div class="adm-field"><label>Google verification</label><input type="text" id="set_seo_google_verification" placeholder="xxxxxxxxxxxxxxxxxx"></div>
               <div class="adm-field"><label>Yandex verification</label><input type="text" id="set_seo_yandex_verification" placeholder="xxxxxxxxxxxxxxxxxx"></div>
               <div class="adm-field"><label>Bing verification</label><input type="text" id="set_seo_bing_verification" placeholder="xxxxxxxxxxxxxxxxxx"></div>
+              <div class="adm-field"><label>Google Analytics ID (G-...)</label><input type="text" id="set_seo_google_analytics_id" placeholder="G-XXXXXXXXXX"></div>
+              <div class="adm-field"><label>Yandex Metrika ID</label><input type="text" id="set_seo_yandex_metrika_id" placeholder="12345678"></div>
             </div>
           </div>
           <div class="muted">Если поля OG и Twitter пустые — используются Title/Description. URL лучше задавать абсолютные.</div>
@@ -3168,6 +3170,8 @@ async function loadStatsLeft(){
     document.getElementById('set_seo_google_verification').value = seo.google_verification || '';
     document.getElementById('set_seo_yandex_verification').value = seo.yandex_verification || '';
     document.getElementById('set_seo_bing_verification').value = seo.bing_verification || '';
+    document.getElementById('set_seo_google_analytics_id').value = seo.google_analytics_id || '';
+    document.getElementById('set_seo_yandex_metrika_id').value = seo.yandex_metrika_id || '';
 
     document.getElementById('set_home_hero_eyebrow').value = home.hero_eyebrow || 'стеллажи из нержавеющей стали';
     document.getElementById('set_home_hero_title').value = home.hero_title || 'Стеллажи для кухни,\\nобщепита и склада';
@@ -3249,7 +3253,9 @@ async function loadStatsLeft(){
         theme_color: (document.getElementById('set_seo_theme_color').value || '').trim(),
         google_verification: (document.getElementById('set_seo_google_verification').value || '').trim(),
         yandex_verification: (document.getElementById('set_seo_yandex_verification').value || '').trim(),
-        bing_verification: (document.getElementById('set_seo_bing_verification').value || '').trim()
+        bing_verification: (document.getElementById('set_seo_bing_verification').value || '').trim(),
+        google_analytics_id: (document.getElementById('set_seo_google_analytics_id').value || '').trim(),
+        yandex_metrika_id: (document.getElementById('set_seo_yandex_metrika_id').value || '').trim()
       },
       home: {
         hero_eyebrow: (document.getElementById('set_home_hero_eyebrow').value || '').trim(),
