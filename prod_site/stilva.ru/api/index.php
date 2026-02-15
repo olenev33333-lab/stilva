@@ -704,11 +704,17 @@ function notifications_settings(PDO $pdo): array {
   if (!is_array($raw)) $raw = [];
   $token = trim((string)($raw['telegram_bot_token'] ?? ''));
   $chatId = trim((string)($raw['telegram_chat_id'] ?? ''));
+  $emailTo = trim((string)($raw['email_to'] ?? ''));
+  $emailSubject = trim((string)($raw['email_subject'] ?? 'Новая заявка STILVA'));
   $enabled = !empty($raw['telegram_enabled']) && $token !== '' && $chatId !== '';
+  $emailEnabled = !empty($raw['email_enabled']) && $emailTo !== '';
   return [
     'telegram_enabled' => $enabled,
     'telegram_bot_token' => $token,
     'telegram_chat_id' => $chatId,
+    'email_enabled' => $emailEnabled,
+    'email_to' => $emailTo,
+    'email_subject' => $emailSubject,
   ];
 }
 
@@ -785,9 +791,11 @@ function notifications_build_order_text(int $orderId, array $orderData, array $i
 
 function notifications_on_new_order(PDO $pdo, int $orderId, array $orderData, array $items): void {
   $cfg = notifications_settings($pdo);
-  if (empty($cfg['telegram_enabled'])) return;
   $text = notifications_build_order_text($orderId, $orderData, $items);
-  notifications_send_telegram((string)$cfg['telegram_bot_token'], (string)$cfg['telegram_chat_id'], $text);
+  if (!empty($cfg['telegram_enabled'])){
+    notifications_send_telegram((string)$cfg['telegram_bot_token'], (string)$cfg['telegram_chat_id'], $text);
+  }
+  // Email channel is intentionally left as a placeholder until SMTP settings are added.
 }
 
 function uuid_v4(): string {

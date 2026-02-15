@@ -758,6 +758,18 @@
             </div>
           </div>
           <div class="muted">Чтобы узнать Chat ID, напишите боту @userinfobot или добавьте своего бота в нужный чат и получите ID через Bot API.</div>
+          <div class="adm-grid" style="margin-top:10px">
+            <div class="adm-col">
+              <div class="adm-field">
+                <label><input type="checkbox" id="set_notify_email_enabled"> Включить email-уведомления (заглушка)</label>
+              </div>
+              <div class="adm-field"><label>Email получателя</label><input type="email" id="set_notify_email_to" placeholder="you@domain.ru"></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Тема письма</label><input type="text" id="set_notify_email_subject" placeholder="Новая заявка STILVA"></div>
+              <div class="muted">SMTP и реальная отправка будут подключены отдельным шагом.</div>
+            </div>
+          </div>
         </div>
 
         <div class="order-section">
@@ -3182,6 +3194,9 @@ async function loadStatsLeft(){
     document.getElementById('set_notify_tg_enabled').checked = !!notifications.telegram_enabled;
     document.getElementById('set_notify_tg_bot_token').value = notifications.telegram_bot_token || '';
     document.getElementById('set_notify_tg_chat_id').value = notifications.telegram_chat_id || '';
+    document.getElementById('set_notify_email_enabled').checked = !!notifications.email_enabled;
+    document.getElementById('set_notify_email_to').value = notifications.email_to || '';
+    document.getElementById('set_notify_email_subject').value = notifications.email_subject || '';
     if (notifyTestStatus) notifyTestStatus.textContent = '';
     const defaultCanonical = (location && location.origin ? location.origin : 'https://stilva.ru') + '/';
     document.getElementById('set_seo_site_name').value = seo.site_name || 'STILVA';
@@ -3270,7 +3285,10 @@ async function loadStatsLeft(){
       notifications: {
         telegram_enabled: document.getElementById('set_notify_tg_enabled').checked ? 1 : 0,
         telegram_bot_token: (document.getElementById('set_notify_tg_bot_token').value || '').trim(),
-        telegram_chat_id: (document.getElementById('set_notify_tg_chat_id').value || '').trim()
+        telegram_chat_id: (document.getElementById('set_notify_tg_chat_id').value || '').trim(),
+        email_enabled: document.getElementById('set_notify_email_enabled').checked ? 1 : 0,
+        email_to: (document.getElementById('set_notify_email_to').value || '').trim(),
+        email_subject: (document.getElementById('set_notify_email_subject').value || '').trim()
       },
       seo: {
         site_name: (document.getElementById('set_seo_site_name').value || '').trim(),
@@ -3340,7 +3358,10 @@ async function loadStatsLeft(){
       notifications: {
         telegram_enabled: document.getElementById('set_notify_tg_enabled').checked ? 1 : 0,
         telegram_bot_token: (document.getElementById('set_notify_tg_bot_token').value || '').trim(),
-        telegram_chat_id: (document.getElementById('set_notify_tg_chat_id').value || '').trim()
+        telegram_chat_id: (document.getElementById('set_notify_tg_chat_id').value || '').trim(),
+        email_enabled: document.getElementById('set_notify_email_enabled').checked ? 1 : 0,
+        email_to: (document.getElementById('set_notify_email_to').value || '').trim(),
+        email_subject: (document.getElementById('set_notify_email_subject').value || '').trim()
       }
     };
     const saveRes = await api('/api/settings', { method:'PATCH', body: JSON.stringify(notificationsPayload) });
