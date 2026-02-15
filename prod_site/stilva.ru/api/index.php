@@ -699,6 +699,97 @@ function settings_set(PDO $pdo, string $key, $value): void {
   $stmt->execute([':k'=>$key, ':v'=>$json]);
 }
 
+function notifications_settings(PDO $pdo): array {
+  $raw = settings_get($pdo, 'notifications', []);
+  if (!is_array($raw)) $raw = [];
+  $token = trim((string)($raw['telegram_bot_token'] ?? ''));
+  $chatId = trim((string)($raw['telegram_chat_id'] ?? ''));
+  $enabled = !empty($raw['telegram_enabled']) && $token !== '' && $chatId !== '';
+  return [
+    'telegram_enabled' => $enabled,
+    'telegram_bot_token' => $token,
+    'telegram_chat_id' => $chatId,
+  ];
+}
+
+function notifications_send_telegram(string $token, string $chatId, string $text): bool {
+  if ($token === '' || $chatId === '') return false;
+  $url = 'https://api.telegram.org/bot'.rawurlencode($token).'/sendMessage';
+  $payload = http_build_query([
+    'chat_id' => $chatId,
+    'text' => $text,
+    'disable_web_page_preview' => '1',
+  ]);
+
+  if (function_exists('curl_init')){
+    $ch = curl_init($url);
+    if ($ch !== false){
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_TIMEOUT, 4);
+      curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+      $resp = curl_exec($ch);
+      $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+      curl_close($ch);
+      if ($resp !== false && $code >= 200 && $code < 300){
+        $json = json_decode((string)$resp, true);
+        return is_array($json) && !empty($json['ok']);
+      }
+    }
+  }
+
+  $ctx = stream_context_create([
+    'http' => [
+      'method' => 'POST',
+      'timeout' => 4,
+      'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
+      'content' => $payload,
+      'ignore_errors' => true,
+    ]
+  ]);
+  $resp = @file_get_contents($url, false, $ctx);
+  if ($resp === false) return false;
+  $json = json_decode((string)$resp, true);
+  return is_array($json) && !empty($json['ok']);
+}
+
+function notifications_build_order_text(int $orderId, array $orderData, array $items): string {
+  $name = trim((string)($orderData['customer_name'] ?? ''));
+  $phone = trim((string)($orderData['phone'] ?? ''));
+  $email = trim((string)($orderData['email'] ?? ''));
+  $note = trim((string)($orderData['note'] ?? ''));
+  $total = (float)($orderData['total'] ?? 0);
+
+  $lines = [];
+  $lines[] = 'Новая заявка #'.$orderId;
+  if ($name !== '') $lines[] = 'Клиент: '.$name;
+  if ($phone !== '') $lines[] = 'Телефон: '.$phone;
+  if ($email !== '') $lines[] = 'Email: '.$email;
+  $lines[] = 'Сумма: '.number_format($total, 2, '.', ' ').' ₽';
+  $lines[] = 'Товары:';
+  foreach ($items as $it){
+    $itemName = trim((string)($it['name'] ?? 'Товар'));
+    $qty = (int)($it['qty'] ?? 1);
+    $lines[] = '- '.$itemName.' × '.$qty;
+  }
+  if ($note !== '') $lines[] = 'Комментарий: '.$note;
+  $lines[] = 'Время: '.date('d.m.Y H:i');
+
+  $text = implode("\n", $lines);
+  if (mb_strlen($text, 'UTF-8') > 3900){
+    $text = mb_substr($text, 0, 3890, 'UTF-8')."\n...";
+  }
+  return $text;
+}
+
+function notifications_on_new_order(PDO $pdo, int $orderId, array $orderData, array $items): void {
+  $cfg = notifications_settings($pdo);
+  if (empty($cfg['telegram_enabled'])) return;
+  $text = notifications_build_order_text($orderId, $orderData, $items);
+  notifications_send_telegram((string)$cfg['telegram_bot_token'], (string)$cfg['telegram_chat_id'], $text);
+}
+
 function uuid_v4(): string {
   $data = random_bytes(16);
   $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
@@ -1568,6 +1659,7 @@ try {
         }
         $pdo->commit();
         try { stock_plan_order($pdo, $oid); } catch (Throwable $e) {}
+        try { notifications_on_new_order($pdo, $oid, $b, $items); } catch (Throwable $e) {}
         out(200, ['id'=>$oid]);
       }catch(Throwable $e){
         $pdo->rollBack();
@@ -1727,6 +1819,24 @@ try {
       }
       out(200, ['ok'=>true]);
     }
+    out(404, ['error'=>'nf']);
+  }
+
+  if (($segments[0] ?? '') === 'notifications'){
+    $pdo = db();
+    settings_bootstrap($pdo);
+
+    if ($method === 'POST' && count($segments) === 2 && $segments[1] === 'test'){
+      $cfg = notifications_settings($pdo);
+      if (empty($cfg['telegram_enabled'])){
+        out(400, ['error'=>'notifications_not_configured']);
+      }
+      $text = "Тест уведомлений STILVA\nВремя: ".date('d.m.Y H:i:s');
+      $ok = notifications_send_telegram((string)$cfg['telegram_bot_token'], (string)$cfg['telegram_chat_id'], $text);
+      if (!$ok) out(502, ['error'=>'send_failed']);
+      out(200, ['ok'=>true]);
+    }
+
     out(404, ['error'=>'nf']);
   }
 

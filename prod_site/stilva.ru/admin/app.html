@@ -738,6 +738,29 @@
         </div>
 
         <div class="order-section">
+          <div class="list-title">Уведомления о новых заявках</div>
+          <div class="adm-grid">
+            <div class="adm-col">
+              <div class="adm-field">
+                <label><input type="checkbox" id="set_notify_tg_enabled"> Включить Telegram-уведомления</label>
+              </div>
+              <div class="adm-field"><label>Bot token</label><input type="text" id="set_notify_tg_bot_token" placeholder="123456789:AA..."></div>
+            </div>
+            <div class="adm-col">
+              <div class="adm-field"><label>Chat ID</label><input type="text" id="set_notify_tg_chat_id" placeholder="-1001234567890 или 123456789"></div>
+              <div class="adm-field">
+                <label>Проверка</label>
+                <div style="display:flex; gap:8px; align-items:center">
+                  <button class="ghost" id="set_notify_tg_test" type="button">Отправить тест</button>
+                  <span class="muted" id="set_notify_tg_test_status"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="muted">Чтобы узнать Chat ID, напишите боту @userinfobot или добавьте своего бота в нужный чат и получите ID через Bot API.</div>
+        </div>
+
+        <div class="order-section">
           <div class="list-title">Настройки сайта (SEO)</div>
           <div class="adm-grid">
             <div class="adm-col">
@@ -3113,6 +3136,8 @@ async function loadStatsLeft(){
   const settingsCancelBtn = document.getElementById('settings-cancel');
   const settingsSaveBtn = document.getElementById('settings-save');
   const settingsGenUidBtn = document.getElementById('set_edi_sender_gen');
+  const notifyTestBtn = document.getElementById('set_notify_tg_test');
+  const notifyTestStatus = document.getElementById('set_notify_tg_test_status');
 
   function uuidv4(){
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
@@ -3153,6 +3178,11 @@ async function loadStatsLeft(){
     document.getElementById('set_basis_name').value = s.basis_name || 'Заказ';
     document.getElementById('set_edi_operator').value = s.edi_operator || '000';
     document.getElementById('set_edi_sender_uid').value = s.edi_sender_uid || '';
+    const notifications = data.notifications || {};
+    document.getElementById('set_notify_tg_enabled').checked = !!notifications.telegram_enabled;
+    document.getElementById('set_notify_tg_bot_token').value = notifications.telegram_bot_token || '';
+    document.getElementById('set_notify_tg_chat_id').value = notifications.telegram_chat_id || '';
+    if (notifyTestStatus) notifyTestStatus.textContent = '';
     const defaultCanonical = (location && location.origin ? location.origin : 'https://stilva.ru') + '/';
     document.getElementById('set_seo_site_name').value = seo.site_name || 'STILVA';
     document.getElementById('set_seo_title').value = seo.title || 'Стеллажи из нержавеющей стали для общепита и склада — STILVA';
@@ -3237,6 +3267,11 @@ async function loadStatsLeft(){
         edi_operator: (document.getElementById('set_edi_operator').value || '000').trim(),
         edi_sender_uid: (document.getElementById('set_edi_sender_uid').value || '').trim()
       },
+      notifications: {
+        telegram_enabled: document.getElementById('set_notify_tg_enabled').checked ? 1 : 0,
+        telegram_bot_token: (document.getElementById('set_notify_tg_bot_token').value || '').trim(),
+        telegram_chat_id: (document.getElementById('set_notify_tg_chat_id').value || '').trim()
+      },
       seo: {
         site_name: (document.getElementById('set_seo_site_name').value || '').trim(),
         title: (document.getElementById('set_seo_title').value || '').trim(),
@@ -3298,6 +3333,34 @@ async function loadStatsLeft(){
     settingsClose();
   }
 
+  async function testNotifications(){
+    if (!notifyTestStatus) return;
+    notifyTestStatus.textContent = 'Отправка...';
+    const notificationsPayload = {
+      notifications: {
+        telegram_enabled: document.getElementById('set_notify_tg_enabled').checked ? 1 : 0,
+        telegram_bot_token: (document.getElementById('set_notify_tg_bot_token').value || '').trim(),
+        telegram_chat_id: (document.getElementById('set_notify_tg_chat_id').value || '').trim()
+      }
+    };
+    const saveRes = await api('/api/settings', { method:'PATCH', body: JSON.stringify(notificationsPayload) });
+    if (!saveRes.ok){
+      notifyTestStatus.textContent = 'Не удалось сохранить настройки';
+      return;
+    }
+    const res = await api('/api/notifications/test', { method:'POST', body:'{}' });
+    if (res.ok){
+      notifyTestStatus.textContent = 'Тест отправлен';
+      return;
+    }
+    const err = await res.json().catch(()=>({}));
+    if (err && err.error === 'notifications_not_configured'){
+      notifyTestStatus.textContent = 'Заполните token/chat_id и включите уведомления';
+      return;
+    }
+    notifyTestStatus.textContent = 'Ошибка отправки';
+  }
+
   function settingsOpen(){
     settingsBackdrop.style.display='flex';
     loadSettings();
@@ -3311,6 +3374,7 @@ async function loadStatsLeft(){
   settingsBackdrop?.addEventListener('click', (e)=>{ if (e.target === settingsBackdrop) settingsClose(); });
   settingsSaveBtn?.addEventListener('click', (e)=>{ e.preventDefault(); saveSettings(); });
   settingsGenUidBtn?.addEventListener('click', (e)=>{ e.preventDefault(); document.getElementById('set_edi_sender_uid').value = uuidv4(); });
+  notifyTestBtn?.addEventListener('click', (e)=>{ e.preventDefault(); testNotifications(); });
 
   /* === УПД === */
   const updBackdrop = document.getElementById('upd-modal-backdrop');
