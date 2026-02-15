@@ -3670,6 +3670,10 @@ async function loadStatsLeft(){
           <input type="text" id="p_seo_title" placeholder="Title для карточки товара">
         </div>
         <div class="adm-field">
+          <label>SEO Slug</label>
+          <input type="text" id="p_seo_slug" placeholder="800x300x1800">
+        </div>
+        <div class="adm-field">
           <label>SEO Description</label>
           <textarea id="p_seo_description" rows="3" placeholder="Meta description карточки товара"></textarea>
         </div>
@@ -3735,7 +3739,7 @@ async function loadStatsLeft(){
         </div>
         <div class="adm-field">
           <label>SEO Canonical</label>
-          <input type="text" id="p_seo_canonical" placeholder="https://stilva.ru/?product=ID">
+          <input type="text" id="p_seo_canonical" placeholder="https://stilva.ru/catalog/slug">
         </div>
         <div class="adm-field">
           <label>OG Title</label>
@@ -3790,6 +3794,7 @@ $('#admAddCancel').addEventListener('click', close);
       shelf_thickness: ($('#p_shelf_thickness').value || '').trim(),
       description: ($('#p_description').value || '').trim(),
       seo_title: ($('#p_seo_title').value || '').trim(),
+      seo_slug: ($('#p_seo_slug').value || '').trim(),
       seo_description: ($('#p_seo_description').value || '').trim(),
       seo_keywords: ($('#p_seo_keywords').value || '').trim(),
       seo_h1: ($('#p_seo_h1').value || '').trim(),
@@ -3886,6 +3891,10 @@ $('#admAddCancel').addEventListener('click', close);
           <input type="text" id="e_seo_title" placeholder="Title для карточки товара">
         </div>
         <div class="adm-field">
+          <label>SEO Slug</label>
+          <input type="text" id="e_seo_slug" placeholder="800x300x1800">
+        </div>
+        <div class="adm-field">
           <label>SEO Description</label>
           <textarea id="e_seo_description" rows="3" placeholder="Meta description карточки товара"></textarea>
         </div>
@@ -3954,7 +3963,7 @@ $('#admAddCancel').addEventListener('click', close);
         </div>
         <div class="adm-field">
           <label>SEO Canonical</label>
-          <input type="text" id="e_seo_canonical" placeholder="https://stilva.ru/?product=ID">
+          <input type="text" id="e_seo_canonical" placeholder="https://stilva.ru/catalog/slug">
         </div>
         <div class="adm-field">
           <label>OG Title</label>
@@ -3995,6 +4004,7 @@ $('#admAddCancel').addEventListener('click', close);
     byId('e_image_url').value = p?.image_url || '';
     byId('e_description').value = p?.description || '';
     byId('e_seo_title').value = p?.seo_title || '';
+    byId('e_seo_slug').value = p?.seo_slug || '';
     byId('e_seo_description').value = p?.seo_description || '';
     byId('e_seo_keywords').value = p?.seo_keywords || '';
     byId('e_seo_h1').value = p?.seo_h1 || '';
@@ -4020,6 +4030,7 @@ $('#admAddCancel').addEventListener('click', close);
       image_url: (byId('e_image_url').value||'').trim(),
       description: (byId('e_description').value||'').trim(),
       seo_title: (byId('e_seo_title').value||'').trim(),
+      seo_slug: (byId('e_seo_slug').value||'').trim(),
       seo_description: (byId('e_seo_description').value||'').trim(),
       seo_keywords: (byId('e_seo_keywords').value||'').trim(),
       seo_h1: (byId('e_seo_h1').value||'').trim(),

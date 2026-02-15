@@ -45,7 +45,7 @@ $urls[] = [
 try {
   $pdo = db();
   try {
-    $stmt = $pdo->query("SELECT id, image_url, seo_canonical FROM products WHERE published = 1 ORDER BY id ASC");
+    $stmt = $pdo->query("SELECT id, image_url, seo_slug, seo_canonical FROM products WHERE published = 1 ORDER BY id ASC");
     $rows = $stmt->fetchAll();
   } catch (Throwable $e) {
     $stmt = $pdo->query("SELECT id, image_url FROM products WHERE published = 1 ORDER BY id ASC");
@@ -58,7 +58,11 @@ try {
     $img = $img !== '' ? abs_url($img, $base, $scheme) : '';
     $loc = trim((string)($r['seo_canonical'] ?? ''));
     if ($loc !== '') $loc = abs_url($loc, $base, $scheme);
-    if ($loc === '') $loc = $base . '?product=' . $id;
+    if ($loc === '') {
+      $slug = trim((string)($r['seo_slug'] ?? ''));
+      if ($slug !== '') $loc = rtrim($base, '/') . '/catalog/' . rawurlencode($slug);
+      else $loc = $base . '?product=' . $id;
+    }
     $urls[] = [
       'loc' => $loc,
       'lastmod' => $today,

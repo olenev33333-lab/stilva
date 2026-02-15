@@ -51,10 +51,22 @@ function product_query_param(array $product): string {
   return $id > 0 ? (string)$id : '';
 }
 
+function product_slug(array $product): string {
+  $slug = trim((string)($product['seo_slug'] ?? ''));
+  if ($slug !== '') return $slug;
+  return product_query_param($product);
+}
+
+function product_public_path(array $product): string {
+  $slug = product_slug($product);
+  if ($slug === '') return '/';
+  return '/catalog/' . rawurlencode($slug);
+}
+
 function product_public_url(array $product, string $siteUrl): string {
-  $id = product_query_param($product);
-  if ($id === '') return $siteUrl;
-  return $siteUrl . '?product=' . rawurlencode($id);
+  $path = product_public_path($product);
+  if ($path === '/') return $siteUrl;
+  return rtrim($siteUrl, '/') . $path;
 }
 
 function phone_digits(string $value): string {
@@ -115,6 +127,7 @@ try {
   $products = $stmt->fetchAll();
   foreach ($products as &$p){
     if (!isset($p['supply_mode']) || $p['supply_mode'] === null || $p['supply_mode'] === '') $p['supply_mode'] = 'stock';
+    if (!isset($p['seo_slug']) || trim((string)$p['seo_slug']) === '') $p['seo_slug'] = (string)($p['id'] ?? '');
     if (!isset($p['seo_title'])) $p['seo_title'] = '';
     if (!isset($p['seo_description'])) $p['seo_description'] = '';
     if (!isset($p['seo_keywords'])) $p['seo_keywords'] = '';
@@ -259,13 +272,38 @@ $contactNote = $homeContactsNote !== '' ? $homeContactsNote : ($contactAddress !
   : 'Пн–пт 10:00–19:00 • Москва • Работаем по всей России');
 
 $productView = null;
-$productQueryRaw = trim((string)($_GET['product'] ?? ''));
-if ($productQueryRaw !== '' && $products) {
+$requestPath = parse_url((string)($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
+$productToken = '';
+$isCatalogPath = false;
+if (preg_match('~^/catalog/([^/]+)/?$~u', $requestPath, $m)) {
+  $productToken = urldecode((string)$m[1]);
+  $isCatalogPath = true;
+} else {
+  $productToken = trim((string)($_GET['product'] ?? ''));
+}
+if ($productToken !== '' && $products) {
   foreach ($products as $p){
-    if ((string)product_query_param($p) === $productQueryRaw){
+    if ((string)product_query_param($p) === $productToken || (string)product_slug($p) === $productToken){
       $productView = $p;
       break;
     }
+  }
+}
+
+if ($productView){
+  $canonicalPath = product_public_path($productView);
+  if ($canonicalPath !== '/' && !$isCatalogPath) {
+    $qs = $_GET;
+    unset($qs['product']);
+    $target = $canonicalPath;
+    if ($qs) $target .= '?' . http_build_query($qs);
+    header('Location: ' . $target, true, 301);
+    exit;
+  }
+  if ($isCatalogPath && $requestPath !== $canonicalPath && $requestPath !== rtrim($canonicalPath, '/')) {
+    $target = $canonicalPath;
+    header('Location: ' . $target, true, 301);
+    exit;
   }
 }
 

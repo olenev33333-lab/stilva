@@ -153,6 +153,7 @@ function product_bootstrap(PDO $pdo): void {
   stock_bootstrap($pdo);
 
   $alter = [
+    'seo_slug' => "ALTER TABLE products ADD COLUMN seo_slug VARCHAR(190) NOT NULL DEFAULT '' AFTER description",
     'seo_title' => "ALTER TABLE products ADD COLUMN seo_title VARCHAR(255) NOT NULL DEFAULT '' AFTER description",
     'seo_description' => "ALTER TABLE products ADD COLUMN seo_description TEXT NULL AFTER seo_title",
     'seo_keywords' => "ALTER TABLE products ADD COLUMN seo_keywords TEXT NULL AFTER seo_description",
@@ -171,6 +172,42 @@ function product_bootstrap(PDO $pdo): void {
     } catch (Throwable $e) {
       // ignore, bootstrap should never break API flow
     }
+  }
+}
+
+function seo_slugify(string $value): string {
+  $value = trim(mb_strtolower($value, 'UTF-8'));
+  if ($value === '') return '';
+  $map = [
+    'а'=>'a','б'=>'b','в'=>'v','г'=>'g','д'=>'d','е'=>'e','ё'=>'e','ж'=>'zh','з'=>'z','и'=>'i','й'=>'y',
+    'к'=>'k','л'=>'l','м'=>'m','н'=>'n','о'=>'o','п'=>'p','р'=>'r','с'=>'s','т'=>'t','у'=>'u','ф'=>'f',
+    'х'=>'h','ц'=>'c','ч'=>'ch','ш'=>'sh','щ'=>'sch','ъ'=>'','ы'=>'y','ь'=>'','э'=>'e','ю'=>'yu','я'=>'ya'
+  ];
+  $value = strtr($value, $map);
+  $value = preg_replace('/[^a-z0-9]+/u', '-', $value) ?? '';
+  $value = trim($value, '-');
+  return $value;
+}
+
+function seo_slug_unique(PDO $pdo, string $slug, int $excludeId = 0): string {
+  $base = trim($slug);
+  if ($base === '') $base = 'product';
+  $candidate = $base;
+  $i = 2;
+  while (true){
+    $sql = "SELECT id FROM products WHERE seo_slug = :slug";
+    $args = [':slug'=>$candidate];
+    if ($excludeId > 0){
+      $sql .= " AND id <> :id";
+      $args[':id'] = $excludeId;
+    }
+    $sql .= " LIMIT 1";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($args);
+    $row = $stmt->fetch();
+    if (!$row) return $candidate;
+    $candidate = $base . '-' . $i;
+    $i++;
   }
 }
 
@@ -1380,6 +1417,10 @@ try {
       $name = trim((string)$b['name']);
       $mode = (string)($b['supply_mode'] ?? 'stock');
       if (!in_array($mode, ['stock','mto','mixed'], true)) $mode = 'stock';
+      $seoSlug = trim((string)($b['seo_slug'] ?? ''));
+      if ($seoSlug === '') $seoSlug = seo_slugify($name);
+      if ($seoSlug === '') $seoSlug = (string)(time());
+      $seoSlug = seo_slug_unique($pdo, $seoSlug);
       $seoTitle = trim((string)($b['seo_title'] ?? ''));
       if ($seoTitle === '') $seoTitle = $name;
       $seoDesc = trim((string)($b['seo_description'] ?? ''));
@@ -1392,9 +1433,9 @@ try {
       if ($seoOgDesc === '') $seoOgDesc = $seoDesc;
       $stmt = $pdo->prepare("INSERT INTO products
         (name, price, published, image_url, shelves, material, construction, perforation, shelf_thickness, description, stock_qty, lead_time_days, supply_mode,
-         seo_title, seo_description, seo_keywords, seo_h1, seo_robots, seo_canonical, seo_og_title, seo_og_description)
+         seo_slug, seo_title, seo_description, seo_keywords, seo_h1, seo_robots, seo_canonical, seo_og_title, seo_og_description)
         VALUES (:name, :price, :published, :image_url, :shelves, :material, :construction, :perforation, :shelf_thickness, :description, :stock_qty, :lead_time_days, :supply_mode,
-         :seo_title, :seo_description, :seo_keywords, :seo_h1, :seo_robots, :seo_canonical, :seo_og_title, :seo_og_description)");
+         :seo_slug, :seo_title, :seo_description, :seo_keywords, :seo_h1, :seo_robots, :seo_canonical, :seo_og_title, :seo_og_description)");
       $stmt->execute([
         ':name' => $name,
         ':price' => (float)($b['price'] ?? 0),
@@ -1409,6 +1450,7 @@ try {
         ':stock_qty' => (int)($b['stock_qty'] ?? 0),
         ':lead_time_days' => (int)($b['lead_time_days'] ?? 0),
         ':supply_mode' => $mode,
+        ':seo_slug' => $seoSlug,
         ':seo_title' => $seoTitle,
         ':seo_description' => $seoDesc,
         ':seo_keywords' => (string)($b['seo_keywords'] ?? ''),
@@ -1436,7 +1478,7 @@ try {
 
       if ($method === 'PUT' || $method === 'PATCH'){
         $b = read_json();
-        $fields = ['name','price','published','image_url','shelves','material','construction','perforation','shelf_thickness','description','stock_qty','lead_time_days','supply_mode','seo_title','seo_description','seo_keywords','seo_h1','seo_robots','seo_canonical','seo_og_title','seo_og_description'];
+        $fields = ['name','price','published','image_url','shelves','material','construction','perforation','shelf_thickness','description','stock_qty','lead_time_days','supply_mode','seo_slug','seo_title','seo_description','seo_keywords','seo_h1','seo_robots','seo_canonical','seo_og_title','seo_og_description'];
         $set = [];
         $args = [':id'=>$id];
         foreach($fields as $f){
@@ -1446,6 +1488,15 @@ try {
               $mode = (string)$b[$f];
               if (!in_array($mode, ['stock','mto','mixed'], true)) $mode = 'stock';
               $args[":$f"] = $mode;
+            } elseif ($f === 'seo_slug') {
+              $slug = seo_slugify((string)$b[$f]);
+              if ($slug === ''){
+                $nameForSlug = trim((string)($b['name'] ?? ''));
+                $slug = seo_slugify($nameForSlug);
+              }
+              if ($slug === '') $slug = (string)$id;
+              $slug = seo_slug_unique($pdo, $slug, $id);
+              $args[":$f"] = $slug;
             } else {
               $args[":$f"] = in_array($f, ['price']) ? (float)$b[$f]
               : (in_array($f, ['shelves','stock_qty','lead_time_days']) ? (int)$b[$f]

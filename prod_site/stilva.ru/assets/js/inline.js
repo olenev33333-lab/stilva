@@ -69,12 +69,24 @@ document.addEventListener('click', (e)=>{
 }, {passive:true});
 // ====== /FULLSIZE IMAGE VIEWER ======
 
+    function currentProductToken(){
+      try{
+        const m = String(location.pathname || '').match(/^\/catalog\/([^/]+)\/?$/);
+        if (m && m[1]) return decodeURIComponent(m[1]);
+      }catch(_){}
+      const params = new URLSearchParams(window.location.search);
+      return params.get('product') || '';
+    }
+
     function focusProductFromQuery(grid){
       if (!grid) return;
-      const params = new URLSearchParams(window.location.search);
-      const id = parseInt(params.get('product') || '', 10);
-      if (!id) return;
-      const card = grid.querySelector(`.product[data-id="${id}"]`);
+      const token = String(currentProductToken() || '').trim();
+      if (!token) return;
+      const card = Array.from(grid.querySelectorAll('.product')).find((el)=>{
+        const slug = String(el.getAttribute('data-slug') || '').trim();
+        const id = String(el.getAttribute('data-id') || '').trim();
+        return slug === token || id === token;
+      });
       if (!card) return;
       card.classList.add('product--focus');
       try { card.scrollIntoView({ behavior:'smooth', block:'center' }); } catch(_) {}
@@ -97,6 +109,8 @@ document.addEventListener('click', (e)=>{
 
         grid.innerHTML = list.map(p=>{
           const title   = p.name || 'Товар';
+          const token   = String((p.seo_slug || '') || p.id || '').trim();
+          const href    = token ? `/catalog/${encodeURIComponent(token)}` : `?product=${p.id}`;
           const price   = +p.price || 0;
           const shelves = +p.shelves || 0;
           const desc    = (p.description || '').trim();
@@ -123,9 +137,9 @@ const imgHtml = p.image_url
           }
 
           return `
-            <article class="product" data-id="${p.id}">
+            <article class="product" data-id="${p.id}" data-slug="${token}">
               <div class="product__body">
-                <div class="product__title"><a class="product__link" href="?product=${p.id}#catalog">${title}</a></div>
+                <div class="product__title"><a class="product__link" href="${href}#catalog">${title}</a></div>
                 <div class="product__status">${statusHtml}</div>
                 <div class="product__price">${price.toLocaleString('ru-RU')}&nbsp;₽</div>
                 <div class="product__tags">
