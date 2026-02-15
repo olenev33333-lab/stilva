@@ -222,6 +222,13 @@
 .stock-file-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stock-file-row input[type=\"file\"]{border:none;padding:0}
 .stock-mini{font-size:12px;color:var(--muted)}
+.stock-movements-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.stock-movements-toolbar input{flex:1 1 260px;min-width:220px}
+.stock-movements-toolbar select{min-width:150px}
+.stock-movements-qty{font-weight:800}
+.stock-movements-qty.pos{color:#166534}
+.stock-movements-qty.neg{color:#b91c1c}
+.stock-movements-qty.zero{color:#64748b}
 #stock-left-table th:nth-child(2), #stock-left-table td:nth-child(2),
 #stock-right-table th:nth-child(2), #stock-right-table td:nth-child(2){
   white-space:normal;
@@ -364,6 +371,7 @@
       <div class="stock-toolbar">
         <input id="stock-search-left" type="text" placeholder="Поиск товара">
         <button id="stock-refresh-left" class="ghost">Обновить</button>
+        <button id="stock-history-left" class="ghost">История</button>
         <button id="stock-in-left">+ Приход</button>
         <button id="stock-adjust-left" class="ghost">Корректировка</button>
         <button id="stock-upd-left" class="ghost">УПД</button>
@@ -544,6 +552,7 @@
           <div class="stock-toolbar">
             <input id="stock-search-right" type="text" placeholder="Поиск товара">
             <button id="stock-refresh-right" class="ghost">Обновить</button>
+            <button id="stock-history-right" class="ghost">История</button>
             <button id="stock-in-right">+ Приход</button>
             <button id="stock-adjust-right" class="ghost">Корректировка</button>
             <button id="stock-upd-right" class="ghost">УПД</button>
@@ -1076,20 +1085,40 @@
 <div class="modal-backdrop" id="stock-movements-backdrop" style="display:none">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stock-movements-title" style="width:min(1100px,96vw)">
     <div class="modal-head">
-      <h3 id="stock-movements-title" class="card-title" style="margin:0">Движения товара</h3>
+      <h3 id="stock-movements-title" class="card-title" style="margin:0">История движений</h3>
       <button class="close-x" id="stock-movements-close">✕</button>
     </div>
     <div style="padding:12px">
+      <div class="stock-movements-toolbar">
+        <input type="text" id="stock-movements-search" placeholder="Поиск: товар, заказ, документ, комментарий">
+        <select id="stock-movements-type">
+          <option value="">Тип: все</option>
+          <option value="in">Приход</option>
+          <option value="out">Списание</option>
+          <option value="reserve">Резерв</option>
+          <option value="release">Снятие резерва</option>
+          <option value="adjust">Корректировка</option>
+        </select>
+        <select id="stock-movements-reason">
+          <option value="">Причина: все</option>
+          <option value="purchase">Закупка</option>
+          <option value="order">Заказ</option>
+          <option value="writeoff">Списание</option>
+          <option value="manual">Вручную</option>
+          <option value="production">Производство</option>
+        </select>
+        <button class="ghost" id="stock-movements-refresh">Обновить</button>
+      </div>
       <div class="scroll-area" id="stock-movements-pane" style="max-height:70vh">
         <div class="pane-overlay"><div class="pane-spinner"></div></div>
         <table id="stock-movements-table">
           <colgroup>
-            <col style="width:140px"><col style="width:140px"><col style="width:90px"><col style="width:120px">
-            <col style="width:90px"><col style="width:90px"><col style="width:300px">
+            <col style="width:140px"><col style="width:220px"><col style="width:140px"><col style="width:90px">
+            <col style="width:120px"><col style="width:90px"><col style="width:90px"><col style="width:280px">
           </colgroup>
           <thead>
             <tr>
-              <th>Дата</th><th>Тип</th><th>Кол-во</th><th>Причина</th>
+              <th>Дата</th><th>Товар</th><th>Тип</th><th>Кол-во</th><th>Причина</th>
               <th>Заказ</th><th>Док</th><th>Комментарий</th>
             </tr>
           </thead>
@@ -2302,6 +2331,7 @@ async function exportDds(side){
 const stockTypeLabels = { in:'Приход', out:'Списание', reserve:'Резерв', release:'Снятие резерва', adjust:'Корректировка' };
 const stockReasonLabels = { purchase:'Закупка', order:'Заказ', writeoff:'Списание', manual:'Вручную', production:'Производство' };
 const stockState = { list: [] };
+const stockMovementsState = { list: [], productId: 0 };
 let stockIncomingSaving = false;
 
 function stockNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -2574,44 +2604,95 @@ async function stockAdjustSave(){
   }
 }
 
+function stockMovementsSignedQty(row){
+  let qtyVal = stockNum(row.qty);
+  if (row.type === 'out' || row.type === 'release') qtyVal = -Math.abs(qtyVal);
+  return qtyVal;
+}
+
+function stockMovementsGetFiltered(){
+  const q = (document.getElementById('stock-movements-search')?.value || '').trim().toLowerCase();
+  const type = document.getElementById('stock-movements-type')?.value || '';
+  const reason = document.getElementById('stock-movements-reason')?.value || '';
+  return (stockMovementsState.list || []).filter(row=>{
+    if (type && row.type !== type) return false;
+    if (reason && row.reason !== reason) return false;
+    if (!q) return true;
+    const order = row.order_id ? ('#' + row.order_id) : '';
+    const doc = row.doc_id ? ('#' + row.doc_id) : '';
+    const dt = row.created_at ? new Date(row.created_at).toLocaleString('ru-RU') : '';
+    const hay = [
+      row.product_name || '',
+      stockTypeLabels[row.type] || row.type || '',
+      stockReasonLabels[row.reason] || row.reason || '',
+      row.comment || '',
+      order,
+      doc,
+      dt
+    ].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+function stockMovementsRenderTable(){
+  const tbody = document.querySelector('#stock-movements-table tbody');
+  if (!tbody) return;
+  const rows = stockMovementsGetFiltered();
+  tbody.innerHTML = '';
+  rows.forEach(row=>{
+    const tr = document.createElement('tr');
+    const dt = row.created_at ? new Date(row.created_at).toLocaleString('ru-RU') : '—';
+    const product = row.product_name || (row.product_id ? ('#' + row.product_id) : '—');
+    const type = stockTypeLabels[row.type] || row.type || '—';
+    const qtyVal = stockMovementsSignedQty(row);
+    const qtyClass = qtyVal > 0 ? 'pos' : (qtyVal < 0 ? 'neg' : 'zero');
+    const qtyLabel = qtyVal > 0 ? ('+' + qtyVal) : String(qtyVal);
+    const reason = stockReasonLabels[row.reason] || row.reason || '—';
+    const order = row.order_id ? ('#' + row.order_id) : '—';
+    const doc = row.doc_id ? ('#' + row.doc_id) : '—';
+    const comment = row.comment ? String(row.comment) : '';
+    tr.innerHTML =
+      `<td class="cell-ellipsis">${dt}</td>` +
+      `<td class="cell-wrap">${product}</td>` +
+      `<td class="cell-ellipsis">${type}</td>` +
+      `<td class="cell-ellipsis"><span class="stock-movements-qty ${qtyClass}">${qtyLabel}</span></td>` +
+      `<td class="cell-ellipsis">${reason}</td>` +
+      `<td class="cell-ellipsis">${order}</td>` +
+      `<td class="cell-ellipsis">${doc}</td>` +
+      `<td class="cell-wrap">${comment || '—'}</td>`;
+    tbody.appendChild(tr);
+  });
+  if (!rows.length){
+    tbody.innerHTML = `<tr><td colspan="8"><span class="muted">Движений нет</span></td></tr>`;
+  }
+}
+
 async function stockMovementsOpen(pid){
+  const productId = parseInt(String(pid || '0'), 10) || 0;
   const back = document.getElementById('stock-movements-backdrop');
   const pane = document.getElementById('stock-movements-pane');
-  const tbody = document.querySelector('#stock-movements-table tbody');
   const title = document.getElementById('stock-movements-title');
-  if (!back || !pane || !tbody || !title) return;
-  const p = (stockState.list || []).find(x => String(x.id) === String(pid));
-  title.textContent = 'Движения товара — ' + (p?.name || ('#' + pid));
+  const search = document.getElementById('stock-movements-search');
+  const typeSel = document.getElementById('stock-movements-type');
+  const reasonSel = document.getElementById('stock-movements-reason');
+  const tbody = document.querySelector('#stock-movements-table tbody');
+  if (!back || !pane || !title || !tbody) return;
+  const p = (stockState.list || []).find(x => String(x.id) === String(productId));
+  const isAll = productId <= 0;
+  title.textContent = isAll ? 'Общая история движений товара' : ('Движения товара — ' + (p?.name || ('#' + productId)));
+  if (search) search.value = '';
+  if (typeSel) typeSel.value = '';
+  if (reasonSel) reasonSel.value = '';
+  stockMovementsState.productId = productId;
   back.style.display = 'flex';
   const cols = document.querySelector('#stock-movements-table colgroup').children.length;
   tbody.innerHTML = skeletonRows(cols, 6);
   await withOverlay(pane, async ()=>{
-    const res = await api('/api/stock/movements?product_id=' + encodeURIComponent(pid));
-    const list = res.ok ? await res.json() : [];
-    tbody.innerHTML = '';
-    list.forEach(row=>{
-      const tr = document.createElement('tr');
-      const dt = row.created_at ? new Date(row.created_at).toLocaleString() : '—';
-      const type = stockTypeLabels[row.type] || row.type || '—';
-      let qtyVal = stockNum(row.qty);
-      if (row.type === 'out' || row.type === 'release') qtyVal = -Math.abs(qtyVal);
-      const reason = stockReasonLabels[row.reason] || row.reason || '—';
-      const order = row.order_id ? ('#' + row.order_id) : '—';
-      const doc = row.doc_id ? ('#' + row.doc_id) : '—';
-      const comment = row.comment ? String(row.comment) : '';
-      tr.innerHTML =
-        `<td class="cell-ellipsis">${dt}</td>` +
-        `<td class="cell-ellipsis">${type}</td>` +
-        `<td class="cell-ellipsis">${qtyVal}</td>` +
-        `<td class="cell-ellipsis">${reason}</td>` +
-        `<td class="cell-ellipsis">${order}</td>` +
-        `<td class="cell-ellipsis">${doc}</td>` +
-        `<td class="cell-wrap">${comment || '—'}</td>`;
-      tbody.appendChild(tr);
-    });
-    if (!list.length){
-      tbody.innerHTML = `<tr><td colspan="7"><span class="muted">Движений нет</span></td></tr>`;
-    }
+    const qs = new URLSearchParams({ limit: '1000' });
+    if (!isAll) qs.set('product_id', String(productId));
+    const res = await api('/api/stock/movements?' + qs.toString());
+    stockMovementsState.list = res.ok ? await res.json() : [];
+    stockMovementsRenderTable();
   });
 }
 
@@ -2948,6 +3029,8 @@ async function loadStatsLeft(){
 
   document.getElementById('stock-refresh-left').addEventListener('click', ()=>loadStock('left', true));
   document.getElementById('stock-refresh-right').addEventListener('click', ()=>loadStock('right', true));
+  document.getElementById('stock-history-left').addEventListener('click', ()=>stockMovementsOpen(0));
+  document.getElementById('stock-history-right').addEventListener('click', ()=>stockMovementsOpen(0));
   document.getElementById('stock-search-left').addEventListener('input', ()=>loadStock('left'));
   document.getElementById('stock-search-right').addEventListener('input', ()=>loadStock('right'));
   document.getElementById('stock-in-left').addEventListener('click', stockIncomingOpen);
@@ -2998,6 +3081,10 @@ async function loadStatsLeft(){
 
   document.getElementById('stock-movements-close')?.addEventListener('click', (e)=>{ e.preventDefault(); stockMovementsClose(); });
   document.getElementById('stock-movements-backdrop')?.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'stock-movements-backdrop') stockMovementsClose(); });
+  document.getElementById('stock-movements-search')?.addEventListener('input', ()=>stockMovementsRenderTable());
+  document.getElementById('stock-movements-type')?.addEventListener('change', ()=>stockMovementsRenderTable());
+  document.getElementById('stock-movements-reason')?.addEventListener('change', ()=>stockMovementsRenderTable());
+  document.getElementById('stock-movements-refresh')?.addEventListener('click', (e)=>{ e.preventDefault(); stockMovementsOpen(stockMovementsState.productId || 0); });
 
   document.getElementById('stock-dds-save')?.addEventListener('click', (e)=>{
     e.preventDefault();
