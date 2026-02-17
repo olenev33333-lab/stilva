@@ -212,6 +212,11 @@ function seo_slug_unique(PDO $pdo, string $slug, int $excludeId = 0): string {
 }
 
 function stock_bootstrap(PDO $pdo){
+  static $bootstrapped = false;
+  if ($bootstrapped) return;
+  // DDL in MySQL causes implicit commit; never run bootstrap mid-transaction.
+  if ($pdo->inTransaction()) return;
+
   $pdo->exec("CREATE TABLE IF NOT EXISTS stock_movements (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
@@ -273,6 +278,8 @@ function stock_bootstrap(PDO $pdo){
   } catch (Throwable $e) {
     // ignore if column already exists or no permission
   }
+
+  $bootstrapped = true;
 }
 
 function stock_reserved_map(PDO $pdo, array $productIds = []): array {
@@ -291,12 +298,23 @@ function stock_reserved_map(PDO $pdo, array $productIds = []): array {
 }
 
 function stock_on_order_map(PDO $pdo, array $productIds = []): array {
+  $activeOrderStatuses = "'Новый','В работе','Критическое ожидание','Передан в доставку'";
   if ($productIds){
     $in = implode(',', array_map('intval', $productIds));
-    $sql = "SELECT product_id, SUM(qty - qty_done) AS on_order
-            FROM production_orders WHERE status='open' AND product_id IN ($in) GROUP BY product_id";
+    $sql = "SELECT po.product_id, SUM(po.qty - po.qty_done) AS on_order
+            FROM production_orders po
+            LEFT JOIN orders o ON o.id = po.order_id
+            WHERE po.status='open'
+              AND po.product_id IN ($in)
+              AND (po.order_id IS NULL OR (o.id IS NOT NULL AND o.status IN ($activeOrderStatuses)))
+            GROUP BY po.product_id";
   } else {
-    $sql = "SELECT product_id, SUM(qty - qty_done) AS on_order FROM production_orders WHERE status='open' GROUP BY product_id";
+    $sql = "SELECT po.product_id, SUM(po.qty - po.qty_done) AS on_order
+            FROM production_orders po
+            LEFT JOIN orders o ON o.id = po.order_id
+            WHERE po.status='open'
+              AND (po.order_id IS NULL OR (o.id IS NOT NULL AND o.status IN ($activeOrderStatuses)))
+            GROUP BY po.product_id";
   }
   $rows = $pdo->query($sql)->fetchAll();
   $map = [];
@@ -314,13 +332,44 @@ function stock_reserved_by_order(PDO $pdo, int $orderId): array {
   return $map;
 }
 
-function stock_production_by_order(PDO $pdo, int $orderId): array {
-  $stmt = $pdo->prepare("SELECT * FROM production_orders WHERE order_id = :oid AND status='open'");
+function stock_production_rows_by_order(PDO $pdo, int $orderId): array {
+  $stmt = $pdo->prepare("SELECT * FROM production_orders
+    WHERE order_id = :oid AND status = 'open'
+    ORDER BY (prod_no IS NOT NULL AND prod_no <> '') DESC, id DESC");
   $stmt->execute([':oid'=>$orderId]);
   $rows = $stmt->fetchAll();
   $map = [];
-  foreach ($rows as $r){ $map[(int)$r['product_id']] = $r; }
+  foreach ($rows as $r){
+    $pid = (int)($r['product_id'] ?? 0);
+    if ($pid <= 0) continue;
+    if (!isset($map[$pid])) $map[$pid] = [];
+    $map[$pid][] = $r;
+  }
   return $map;
+}
+
+function stock_production_by_order(PDO $pdo, int $orderId): array {
+  $rowsByProduct = stock_production_rows_by_order($pdo, $orderId);
+  $map = [];
+  foreach ($rowsByProduct as $pid => $rows){
+    if (!empty($rows)) $map[(int)$pid] = $rows[0];
+  }
+  return $map;
+}
+
+function stock_cancel_open_production_rows(PDO $pdo, int $orderId, int $productId, ?int $exceptId = null): void {
+  if ($orderId <= 0 || $productId <= 0) return;
+  if ($exceptId && $exceptId > 0){
+    $stmt = $pdo->prepare("UPDATE production_orders
+      SET status = 'cancelled', prod_state = 'cancelled'
+      WHERE order_id = :oid AND product_id = :pid AND status = 'open' AND id <> :id");
+    $stmt->execute([':oid'=>$orderId, ':pid'=>$productId, ':id'=>$exceptId]);
+    return;
+  }
+  $stmt = $pdo->prepare("UPDATE production_orders
+    SET status = 'cancelled', prod_state = 'cancelled'
+    WHERE order_id = :oid AND product_id = :pid AND status = 'open'");
+  $stmt->execute([':oid'=>$orderId, ':pid'=>$productId]);
 }
 
 function stock_insert_movement(PDO $pdo, array $row){
@@ -367,7 +416,16 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
   $items = $itemsStmt->fetchAll();
   if (!$items) return;
 
-  $productIds = array_values(array_unique(array_map(fn($x)=>(int)$x['product_id'], $items)));
+  $orderQtyByProduct = [];
+  foreach ($items as $it){
+    $pid = (int)($it['product_id'] ?? 0);
+    $qty = (int)($it['qty'] ?? 0);
+    if ($pid <= 0 || $qty <= 0) continue;
+    $orderQtyByProduct[$pid] = ($orderQtyByProduct[$pid] ?? 0) + $qty;
+  }
+  if (!$orderQtyByProduct) return;
+
+  $productIds = array_map('intval', array_keys($orderQtyByProduct));
   $in = implode(',', array_map('intval', $productIds));
   $products = $pdo->query("SELECT id, stock_qty, supply_mode FROM products WHERE id IN ($in)")->fetchAll();
   $productMap = [];
@@ -375,19 +433,19 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
 
   $reservedTotal = stock_reserved_map($pdo, $productIds);
   $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
-  $prodByOrder = stock_production_by_order($pdo, $orderId);
+  $prodRowsByOrder = stock_production_rows_by_order($pdo, $orderId);
   $prodHead = production_order_head($pdo, $orderId);
 
-  foreach ($items as $it){
-    $pid = (int)$it['product_id'];
-    $orderQty = (int)$it['qty'];
+  foreach ($orderQtyByProduct as $pid => $orderQty){
     $p = $productMap[$pid] ?? null;
     if (!$p) continue;
     $mode = $p['supply_mode'] ?: 'stock';
 
-    $available = max(0, (int)$p['stock_qty'] - (int)($reservedTotal[$pid] ?? 0));
-    $desiredReserve = ($mode === 'mto') ? 0 : min($available, $orderQty);
     $currentReserve = (int)($reservedByOrder[$pid] ?? 0);
+    $reservedOther = (int)($reservedTotal[$pid] ?? 0) - $currentReserve;
+    if ($reservedOther < 0) $reservedOther = 0;
+    $availableForOrder = max(0, (int)$p['stock_qty'] - $reservedOther);
+    $desiredReserve = ($mode === 'mto') ? 0 : min($availableForOrder, $orderQty);
     $delta = $desiredReserve - $currentReserve;
     if ($delta > 0){
       stock_insert_movement($pdo, [
@@ -399,6 +457,7 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
         'comment'=>'Резерв под заказ #'.$orderId,
       ]);
       $reservedTotal[$pid] = ($reservedTotal[$pid] ?? 0) + $delta;
+      $reservedByOrder[$pid] = $currentReserve + $delta;
     } elseif ($delta < 0){
       stock_insert_movement($pdo, [
         'product_id'=>$pid,
@@ -409,17 +468,32 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
         'comment'=>'Снятие резерва #'.$orderId,
       ]);
       $reservedTotal[$pid] = ($reservedTotal[$pid] ?? 0) - abs($delta);
+      $reservedByOrder[$pid] = max(0, $currentReserve - abs($delta));
     }
 
     $missing = ($mode === 'mto') ? $orderQty : max(0, $orderQty - $desiredReserve);
-    $prod = $prodByOrder[$pid] ?? null;
+    $prodRows = $prodRowsByOrder[$pid] ?? [];
+    $prod = !empty($prodRows) ? $prodRows[0] : null;
     if ($missing > 0){
       if ($prod){
         $qtyDone = (int)$prod['qty_done'];
         $target = max($missing, $qtyDone);
         $newStatus = ($qtyDone >= $target) ? 'closed' : 'open';
-        $upd = $pdo->prepare("UPDATE production_orders SET qty = :q, status = :st WHERE id = :id");
-        $upd->execute([':q'=>$target, ':st'=>$newStatus, ':id'=>$prod['id']]);
+        $set = ["qty = :q", "status = :st"];
+        $args = [':q'=>$target, ':st'=>$newStatus, ':id'=>$prod['id']];
+        if (!empty($prodHead['prod_no'])){
+          $set[] = "prod_no = :no";
+          $set[] = "prod_address = :addr";
+          $set[] = "deadline_date = :dl";
+          $set[] = "source = 'auto'";
+          $set[] = "prod_state = IF(prod_state='cancelled','draft',prod_state)";
+          $args[':no'] = $prodHead['prod_no'];
+          $args[':addr'] = $prodHead['prod_address'] ?: null;
+          $args[':dl'] = $prodHead['deadline_date'] ?: null;
+        }
+        $upd = $pdo->prepare("UPDATE production_orders SET ".implode(',', $set)." WHERE id = :id");
+        $upd->execute($args);
+        stock_cancel_open_production_rows($pdo, $orderId, $pid, (int)$prod['id']);
       } else {
         $ins = $pdo->prepare("INSERT INTO production_orders (product_id, order_id, qty, qty_done, status, comment, created_by)
           VALUES (:pid,:oid,:q,0,'open',:cmt,:cb)");
@@ -441,15 +515,12 @@ function stock_apply_reservation(PDO $pdo, int $orderId){
               ':no'=>$prodHead['prod_no'],
               ':addr'=>$prodHead['prod_address'] ?: null,
               ':dl'=>$prodHead['deadline_date'] ?: null,
-              ':id'=>(int)$pdo->lastInsertId()
+            ':id'=>(int)$pdo->lastInsertId()
             ]);
         }
       }
     } else {
-      if ($prod){
-        $upd = $pdo->prepare("UPDATE production_orders SET status='cancelled' WHERE id = :id");
-        $upd->execute([':id'=>$prod['id']]);
-      }
+      stock_cancel_open_production_rows($pdo, $orderId, $pid);
     }
   }
 }
@@ -465,33 +536,58 @@ function stock_plan_order(PDO $pdo, int $orderId){
   $items = $itemsStmt->fetchAll();
   if (!$items) return;
 
-  $productIds = array_values(array_unique(array_map(fn($x)=>(int)$x['product_id'], $items)));
+  $orderQtyByProduct = [];
+  foreach ($items as $it){
+    $pid = (int)($it['product_id'] ?? 0);
+    $qty = (int)($it['qty'] ?? 0);
+    if ($pid <= 0 || $qty <= 0) continue;
+    $orderQtyByProduct[$pid] = ($orderQtyByProduct[$pid] ?? 0) + $qty;
+  }
+  if (!$orderQtyByProduct) return;
+
+  $productIds = array_map('intval', array_keys($orderQtyByProduct));
   $in = implode(',', array_map('intval', $productIds));
   $products = $pdo->query("SELECT id, stock_qty, supply_mode FROM products WHERE id IN ($in)")->fetchAll();
   $productMap = [];
   foreach ($products as $p){ $productMap[(int)$p['id']] = $p; }
 
   $reservedTotal = stock_reserved_map($pdo, $productIds);
-  $prodByOrder = stock_production_by_order($pdo, $orderId);
+  $reservedByOrder = stock_reserved_by_order($pdo, $orderId);
+  $prodRowsByOrder = stock_production_rows_by_order($pdo, $orderId);
   $prodHead = production_order_head($pdo, $orderId);
 
-  foreach ($items as $it){
-    $pid = (int)$it['product_id'];
-    $orderQty = (int)$it['qty'];
+  foreach ($orderQtyByProduct as $pid => $orderQty){
     $p = $productMap[$pid] ?? null;
     if (!$p) continue;
     $mode = $p['supply_mode'] ?: 'stock';
 
-    $available = max(0, (int)$p['stock_qty'] - (int)($reservedTotal[$pid] ?? 0));
-    $missing = ($mode === 'mto') ? $orderQty : max(0, $orderQty - $available);
-    $prod = $prodByOrder[$pid] ?? null;
+    $currentReserve = (int)($reservedByOrder[$pid] ?? 0);
+    $reservedOther = (int)($reservedTotal[$pid] ?? 0) - $currentReserve;
+    if ($reservedOther < 0) $reservedOther = 0;
+    $availableForOrder = max(0, (int)$p['stock_qty'] - $reservedOther);
+    $missing = ($mode === 'mto') ? $orderQty : max(0, $orderQty - $availableForOrder);
+    $prodRows = $prodRowsByOrder[$pid] ?? [];
+    $prod = !empty($prodRows) ? $prodRows[0] : null;
     if ($missing > 0){
       if ($prod){
         $qtyDone = (int)$prod['qty_done'];
         $target = max($missing, $qtyDone);
         $newStatus = ($qtyDone >= $target) ? 'closed' : 'open';
-        $upd = $pdo->prepare("UPDATE production_orders SET qty = :q, status = :st WHERE id = :id");
-        $upd->execute([':q'=>$target, ':st'=>$newStatus, ':id'=>$prod['id']]);
+        $set = ["qty = :q", "status = :st"];
+        $args = [':q'=>$target, ':st'=>$newStatus, ':id'=>$prod['id']];
+        if (!empty($prodHead['prod_no'])){
+          $set[] = "prod_no = :no";
+          $set[] = "prod_address = :addr";
+          $set[] = "deadline_date = :dl";
+          $set[] = "source = 'auto'";
+          $set[] = "prod_state = IF(prod_state='cancelled','draft',prod_state)";
+          $args[':no'] = $prodHead['prod_no'];
+          $args[':addr'] = $prodHead['prod_address'] ?: null;
+          $args[':dl'] = $prodHead['deadline_date'] ?: null;
+        }
+        $upd = $pdo->prepare("UPDATE production_orders SET ".implode(',', $set)." WHERE id = :id");
+        $upd->execute($args);
+        stock_cancel_open_production_rows($pdo, $orderId, $pid, (int)$prod['id']);
       } else {
         $ins = $pdo->prepare("INSERT INTO production_orders (product_id, order_id, qty, qty_done, status, comment, created_by)
           VALUES (:pid,:oid,:q,0,'open',:cmt,:cb)");
@@ -513,15 +609,12 @@ function stock_plan_order(PDO $pdo, int $orderId){
               ':no'=>$prodHead['prod_no'],
               ':addr'=>$prodHead['prod_address'] ?: null,
               ':dl'=>$prodHead['deadline_date'] ?: null,
-              ':id'=>(int)$pdo->lastInsertId()
+            ':id'=>(int)$pdo->lastInsertId()
             ]);
         }
       }
     } else {
-      if ($prod){
-        $upd = $pdo->prepare("UPDATE production_orders SET status='cancelled' WHERE id = :id");
-        $upd->execute([':id'=>$prod['id']]);
-      }
+      stock_cancel_open_production_rows($pdo, $orderId, $pid);
     }
   }
 }
@@ -613,24 +706,45 @@ function stock_unfulfill_order(PDO $pdo, int $orderId){
   }
 }
 
+function stock_apply_by_order_status(PDO $pdo, int $orderId, string $status): void {
+  $reserveStatuses = ['В работе','Критическое ожидание','Передан в доставку'];
+  if (in_array($status, $reserveStatuses, true)){
+    stock_apply_reservation($pdo, $orderId);
+    return;
+  }
+  if ($status === 'Выполнен'){
+    stock_release_reserve($pdo, $orderId);
+    return;
+  }
+  if ($status === 'Новый'){
+    stock_release_reserve($pdo, $orderId);
+    stock_plan_order($pdo, $orderId);
+    return;
+  }
+  stock_cancel_order($pdo, $orderId);
+}
+
+function stock_rebalance_order_current_status(PDO $pdo, int $orderId): void {
+  if ($orderId <= 0) return;
+  $stmt = $pdo->prepare("SELECT status FROM orders WHERE id = :id");
+  $stmt->execute([':id'=>$orderId]);
+  $row = $stmt->fetch();
+  if (!$row) return;
+  stock_apply_by_order_status($pdo, (int)$orderId, (string)($row['status'] ?? ''));
+}
+
 function stock_sync_order(PDO $pdo, int $orderId, string $prevStatus, string $newStatus){
   try {
     if ($prevStatus === $newStatus) return;
     if ($prevStatus === 'Выполнен' && $newStatus !== 'Выполнен'){
       stock_unfulfill_order($pdo, $orderId);
     }
-    $reserveStatuses = ['В работе','Критическое ожидание','Передан в доставку'];
-    if (in_array($newStatus, $reserveStatuses, true)){
-      stock_apply_reservation($pdo, $orderId);
-    } elseif ($newStatus === 'Выполнен') {
+    if ($newStatus === 'Выполнен') {
       stock_apply_reservation($pdo, $orderId);
       stock_fulfill_order($pdo, $orderId);
-    } elseif ($newStatus === 'Новый') {
-      stock_release_reserve($pdo, $orderId);
-      stock_plan_order($pdo, $orderId);
-    } else {
-      stock_cancel_order($pdo, $orderId);
+      return;
     }
+    stock_apply_by_order_status($pdo, $orderId, $newStatus);
   } catch (Throwable $e) {
     // intentionally ignore to avoid breaking order flow
   }
@@ -653,6 +767,10 @@ function production_order_state(string $value): string {
 }
 
 function production_bootstrap(PDO $pdo): void {
+  static $bootstrapped = false;
+  if ($bootstrapped) return;
+  if ($pdo->inTransaction()) return;
+
   stock_bootstrap($pdo);
   $alter = [
     'prod_no' => "ALTER TABLE production_orders ADD COLUMN prod_no VARCHAR(40) NULL AFTER order_id",
@@ -693,6 +811,8 @@ function production_bootstrap(PDO $pdo): void {
     KEY idx_prod_no (prod_no),
     KEY idx_order_id (order_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $bootstrapped = true;
 }
 
 function production_next_no(PDO $pdo): string {
@@ -788,9 +908,25 @@ function production_state_to_row_status(string $state): string {
 
 function production_touch_rows_state(PDO $pdo, string $prodNo, string $state): void {
   $state = production_order_state($state);
-  $status = production_state_to_row_status($state);
-  $stmt = $pdo->prepare("UPDATE production_orders SET prod_state = :st, status = :status WHERE prod_no = :no");
-  $stmt->execute([':st'=>$state, ':status'=>$status, ':no'=>$prodNo]);
+  if ($state === 'cancelled'){
+    $stmt = $pdo->prepare("UPDATE production_orders
+      SET prod_state = 'cancelled', status = 'cancelled'
+      WHERE prod_no = :no");
+    $stmt->execute([':no'=>$prodNo]);
+    return;
+  }
+  if ($state === 'closed'){
+    $stmt = $pdo->prepare("UPDATE production_orders
+      SET prod_state = 'closed', status = 'closed'
+      WHERE prod_no = :no");
+    $stmt->execute([':no'=>$prodNo]);
+    return;
+  }
+  $stmt = $pdo->prepare("UPDATE production_orders
+    SET prod_state = CASE WHEN stage_stock = 'done' THEN 'closed' ELSE :st END,
+        status = CASE WHEN stage_stock = 'done' THEN 'closed' ELSE 'open' END
+    WHERE prod_no = :no");
+  $stmt->execute([':st'=>$state, ':no'=>$prodNo]);
 }
 
 function production_make_item_stock_done(PDO $pdo, array $row): void {
@@ -819,7 +955,7 @@ function production_make_item_stock_done(PDO $pdo, array $row): void {
     WHERE id = :id")->execute([':id'=>$id]);
   $orderId = isset($row['order_id']) ? (int)$row['order_id'] : 0;
   if ($orderId > 0){
-    stock_apply_reservation($pdo, $orderId);
+    stock_rebalance_order_current_status($pdo, $orderId);
   }
 }
 
@@ -1940,7 +2076,7 @@ try {
         try { notifications_on_new_order($pdo, $oid, $b, $items); } catch (Throwable $e) {}
         out(200, ['id'=>$oid]);
       }catch(Throwable $e){
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         out(500, ['error'=>'fail']);
       }
     }
@@ -2048,6 +2184,12 @@ try {
 
       if ($method === 'DELETE'){
         try { stock_cancel_order($pdo, $id); } catch (Throwable $e) {}
+        try {
+          $pdo->prepare("UPDATE production_orders
+            SET status='cancelled', prod_state='cancelled'
+            WHERE order_id = :id AND status = 'open'")
+            ->execute([':id'=>$id]);
+        } catch (Throwable $e) {}
         $stmt = $pdo->prepare("DELETE FROM orders WHERE id = :id");
         $stmt->execute([':id'=>$id]);
         out(200, ['ok'=>true]);
@@ -2440,7 +2582,7 @@ try {
         $pdo->commit();
         out(200, ['doc_id'=>$docId]);
       }catch(Throwable $e){
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         out(500, ['error'=>'fail']);
       }
     }
@@ -2458,7 +2600,7 @@ try {
         $stmt = $pdo->prepare("SELECT stock_qty FROM products WHERE id = :id");
         $stmt->execute([':id'=>$pid]);
         $row = $stmt->fetch();
-        if (!$row){ $pdo->rollBack(); out(404, ['error'=>'nf']); }
+        if (!$row){ if ($pdo->inTransaction()) $pdo->rollBack(); out(404, ['error'=>'nf']); }
         $cur = (int)$row['stock_qty'];
         $new = $cur + $delta;
         if ($new < 0) $new = 0;
@@ -2478,7 +2620,7 @@ try {
         $pdo->commit();
         out(200, ['ok'=>true, 'qty'=>$new]);
       }catch(Throwable $e){
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         out(500, ['error'=>'fail']);
       }
     }
@@ -2615,18 +2757,26 @@ try {
 
       $pdo->beginTransaction();
       try {
-        $currentRows = production_fetch_rows($pdo, $prodNo);
+        $allOpenStmt = $pdo->prepare("SELECT * FROM production_orders
+          WHERE order_id = :oid AND status = 'open'
+          ORDER BY (prod_no = :no) DESC, (prod_no IS NOT NULL AND prod_no <> '') DESC, id DESC");
+        $allOpenStmt->execute([':oid'=>$orderId, ':no'=>$prodNo]);
+        $allOpenRows = $allOpenStmt->fetchAll();
+
         $byProduct = [];
-        foreach ($currentRows as $r){
+        foreach ($allOpenRows as $r){
           $pid = (int)($r['product_id'] ?? 0);
-          if ($pid > 0) $byProduct[$pid] = $r;
+          if ($pid <= 0) continue;
+          if (!isset($byProduct[$pid])) $byProduct[$pid] = [];
+          $byProduct[$pid][] = $r;
         }
-        $keep = [];
+
+        $keepIds = [];
         foreach ($short as $it){
           $pid = (int)$it['product_id'];
           $qty = (int)$it['qty'];
-          $keep[$pid] = true;
-          $row = $byProduct[$pid] ?? null;
+          $rowsForPid = $byProduct[$pid] ?? [];
+          $row = !empty($rowsForPid) ? $rowsForPid[0] : null;
           if ($row){
             $pdo->prepare("UPDATE production_orders
               SET qty = :q,
@@ -2648,6 +2798,7 @@ try {
                 ':cmt'=>$comment ?: null,
                 ':id'=>(int)$row['id'],
               ]);
+            $keepIds[(int)$row['id']] = true;
           } else {
             $pdo->prepare("INSERT INTO production_orders
               (product_id, order_id, prod_no, qty, qty_done, status, prod_state, prod_address, deadline_date, source, comment, created_by)
@@ -2662,17 +2813,19 @@ try {
                 ':cmt'=>$comment ?: ('Под заказ #'.$orderId),
                 ':cb'=>'admin',
               ]);
+            $keepIds[(int)$pdo->lastInsertId()] = true;
           }
         }
-        foreach ($currentRows as $r){
-          $pid = (int)($r['product_id'] ?? 0);
-          if (!$pid || isset($keep[$pid])) continue;
+
+        foreach ($allOpenRows as $r){
+          $id = (int)($r['id'] ?? 0);
+          if ($id <= 0 || isset($keepIds[$id])) continue;
           $pdo->prepare("UPDATE production_orders SET status='cancelled', prod_state='cancelled' WHERE id = :id")
-            ->execute([':id'=>(int)$r['id']]);
+            ->execute([':id'=>$id]);
         }
         $pdo->commit();
       } catch (Throwable $e){
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         out(500, ['error'=>'fail']);
       }
 
@@ -2771,12 +2924,12 @@ try {
           $count++;
         }
         if ($count <= 0){
-          $pdo->rollBack();
+          if ($pdo->inTransaction()) $pdo->rollBack();
           out(400, ['error'=>'no_valid_items']);
         }
         $pdo->commit();
       }catch(Throwable $e){
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         out(500, ['error'=>'fail']);
       }
 
@@ -2923,7 +3076,7 @@ try {
 
           $rowsAfter = production_fetch_rows($pdo, $prodNo);
           if (!$rowsAfter){
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) $pdo->rollBack();
             out(404, ['error'=>'nf']);
           }
           if ($state === null){
@@ -2932,7 +3085,7 @@ try {
           }
           $pdo->commit();
         }catch(Throwable $e){
-          $pdo->rollBack();
+          if ($pdo->inTransaction()) $pdo->rollBack();
           out(500, ['error'=>'fail']);
         }
         $rowsFinal = production_fetch_rows($pdo, $prodNo);
