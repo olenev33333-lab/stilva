@@ -115,12 +115,12 @@ document.addEventListener('click', (e)=>{
           const shelves = +p.shelves || 0;
           const desc    = (p.description || '').trim();
 const imgHtml = p.image_url
-  ? `<img src="${p.image_url}"
+  ? `<img class="product__img-el"
+          src="${p.image_url}"
           data-full="${p.image_full_url || p.image_url}"
           alt="${title}"
           loading="lazy"
-          decoding="async"
-          style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">`
+          decoding="async">`
   : `Фото изделия`;
 
           const available = Math.max(0, Number(p.available_qty ?? p.stock_qty ?? 0));

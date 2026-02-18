@@ -397,7 +397,7 @@ if ($products){
 
     $img = trim((string)($p['image_url'] ?? ''));
     $imgHtml = $img !== ''
-      ? '<img src="'.h($img).'" data-full="'.h($img).'" alt="'.h($titleText).'" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;border-radius:12px;cursor:pointer">'
+      ? '<img class="product__img-el" src="'.h($img).'" data-full="'.h($img).'" alt="'.h($titleText).'" loading="lazy" decoding="async">'
       : 'Фото изделия';
 
     $priceText = number_format($price, 0, '.', ' ');
